@@ -4,7 +4,7 @@
   "description": "Socean Stake Pool Typescript SDK",
   "author": "socean finance <socean@socean.fi>",
   "repository": "https://github.com/igneous-labs/socean-ts-sdk",
-  "license": "TODO",
+  "license": "MIT",
   "keywords": [
     "socean.fi",
     "staking",
@@ -21,7 +21,7 @@
   },
   "scripts": {
     "cli": "ts-node src/cli.ts",
-    "lint": "eslint src/ --ext .js,,.ts",
+    "lint": "eslint src/ --ext .js,.ts",
     "test": "ts-mocha tests/*.ts",
     "clean": "rm -rf dist build package",
     "ts-node": "ts-node",
