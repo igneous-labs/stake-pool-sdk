@@ -1,9 +1,15 @@
+import { Socean } from '../src/main';
 import { strict as assert } from 'assert';
 
 describe('test basic functionalities', () => {
-  it('it works', async () => {
-    assert.equal(2 + 2, 4);
-    assert.notEqual(2 + 2, 5);
-    console.log('it works.');
+  it('it initializes', async () => {
+    let socean = new Socean();
+    console.log(socean);
+  });
+
+  it('it gets stake pool account', async () => {
+    let socean = new Socean();
+    let res = await socean.getStakePoolAccount();
+    console.log(res);
   });
 });
