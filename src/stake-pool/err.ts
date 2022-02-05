@@ -1,3 +1,8 @@
+/**
+ * Custom error definitions and helpers
+ *
+ * @module
+ */
 import { Keypair, TransactionSignature } from "@solana/web3.js";
 
 /**

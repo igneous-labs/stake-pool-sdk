@@ -1,14 +1,23 @@
-//import { Provider, Wallet, web3 } from '@project-serum/anchor';
+/**
+ * Socean class
+ *
+ * @module
+ */
+import {
+  AccountInfo,
+  Transaction,
+  SOLANA_SCHEMA,
+} from "@solana/web3.js";
 
-import { AccountInfo, SOLANA_SCHEMA } from "@solana/web3.js";
+import BN from "bn.js"
 
-import * as schema from "./schema";
-import { addStakePoolSchema } from "./schema";
+import * as schema from "./stake-pool/schema";
+import { addStakePoolSchema } from "./stake-pool/schema";
 addStakePoolSchema(SOLANA_SCHEMA);
 
 import { SoceanConfig, ClusterType } from "./config";
-import { tryAwait } from "./err";
-import { StakePoolAccount } from './types';
+import { tryAwait } from "./stake-pool/err";
+import { StakePoolAccount } from './stake-pool/types';
 import { reverse } from './helpers';
 
 export class Socean {
@@ -19,9 +28,25 @@ export class Socean {
   }
 
   /**
+   * Deposits sol into Socean stake pool
+   */
+  async depositSol(amountLamports: BN, ): Promise<Transaction | null> {
+    const tx = new Transaction();
+    console.log(amountLamports);
+
+    // check if the wallet public key as scnSOL associated token account
+    // if not create one
+    //tx.add();
+
+    // prep deposit sol instruction
+    //const ix = depositSolInstruction(amountLamports);
+    //tx.add();
+    return tx;
+  }
+
+
+  /**
    * Retrieves and deserializes a StakePool account
-   * @param connection: An active web3js connection.
-   * @param stakePoolPubKey: The public key (address) of the stake pool account.
    */
   async getStakePoolAccount(): Promise<StakePoolAccount | null> {
     const account = await tryAwait(this.config.connection.getAccountInfo(this.config.stakePoolAccountPubkey));
