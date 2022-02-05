@@ -1,9 +1,7 @@
 import {
-  AccountInfo,
   Connection,
   PublicKey,
   clusterApiUrl,
-  SOLANA_SCHEMA,
 } from "@solana/web3.js";
 
 const MAINNET_STAKEPOOL_ACCOUNT_STR = "5oc4nmbNTda9fx8Tw57ShLD132aqDK65vuHH4RU1K4LZ";
