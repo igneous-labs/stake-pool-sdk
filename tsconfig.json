@@ -5,7 +5,11 @@
     "moduleResolution": "node",
     "declaration": true,
     "strict": true,
-    "noImplicitAny": true /* Raise error on expressions and declarations with an implied 'any' type. */,
+
+    // TODO: figure out the arg type for the cli functions
+    //"noImplicitAny": true /* Raise error on expressions and declarations with an implied 'any' type. */,
+    "noImplicitAny": false,
+
     "strictNullChecks": true /* Enable strict null checks. */,
     "strictFunctionTypes": true /* Enable strict checking of function types. */,
     "noUnusedParameters": true /* Report errors on unused parameters. */,
@@ -14,7 +18,7 @@
 
     // temporarily disabled
     //"noUnusedLocals": true /* Report errors on unused locals. */,
-    "noUnusedLocals": false/* Report errors on unused locals. */,
+    "noUnusedLocals": false,
 
     /* schema */
     "strictPropertyInitialization": false,
