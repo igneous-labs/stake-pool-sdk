@@ -2,9 +2,7 @@
 
 import {
   AccountInfo,
-  Connection,
   PublicKey,
-  clusterApiUrl,
   SOLANA_SCHEMA,
 } from "@solana/web3.js";
 
