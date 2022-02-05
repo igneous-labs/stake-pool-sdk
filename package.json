@@ -48,6 +48,7 @@
     "typescript": "^4.5.5"
   },
   "dependencies": {
+    "@solana/spl-token": "^0.1.8",
     "@solana/web3.js": "^1.32.0",
     "@types/yargs": "^17.0.8",
     "borsh": "^0.7.0",

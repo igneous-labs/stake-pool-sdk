@@ -1,4 +1,4 @@
-import { Socean } from '../src/main';
+import { Socean } from '../src';
 import { strict as assert } from 'assert';
 
 describe('test basic functionalities', () => {
@@ -14,9 +14,9 @@ describe('test basic functionalities', () => {
     console.log(res);
   });
 
-  it('it deposits sol', async () => {
-    const socean = new Socean();
-    const res = await socean.depositSol(new BN(1));
-    console.log(res);
-  });
+//  it('it deposits sol', async () => {
+//    const socean = new Socean();
+//    const res = await socean.depositSol(new BN(1));
+//    console.log(res);
+//  });
 });

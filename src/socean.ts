@@ -3,22 +3,15 @@
  *
  * @module
  */
-import {
-  AccountInfo,
-  Transaction,
-  SOLANA_SCHEMA,
-} from "@solana/web3.js";
-
+import { Transaction } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import BN from "bn.js"
 
-import * as schema from "./stake-pool/schema";
-import { addStakePoolSchema } from "./stake-pool/schema";
-addStakePoolSchema(SOLANA_SCHEMA);
-
 import { SoceanConfig, ClusterType } from "./config";
+import { StakePoolAccount } from "./stake-pool/types";
+import { getStakePoolFromAccountInfo } from  "./stake-pool/helpers";
 import { tryAwait } from "./stake-pool/err";
-import { StakePoolAccount } from './stake-pool/types';
-import { reverse } from './helpers';
+import { depositSolInstruction } from "./stake-pool/instructions";
 
 export class Socean {
   private readonly config: SoceanConfig;
@@ -28,7 +21,7 @@ export class Socean {
   }
 
   /**
-   * Deposits sol into Socean stake pool
+   * Returns Transaction that deposits sol into Socean stake pool
    */
   async depositSol(amountLamports: BN, ): Promise<Transaction | null> {
     const tx = new Transaction();
@@ -39,8 +32,43 @@ export class Socean {
     //tx.add();
 
     // prep deposit sol instruction
-    //const ix = depositSolInstruction(amountLamports);
-    //tx.add();
+    /**
+    * Initializes a DepositSol stake pool instruction given the required accounts and data
+    * @param stakePoolProgramId: Pubkey of the stake pool program
+    * @param stakePool: Pubkey of the stake pool to deposit to
+    * @param stakePoolWithdrawAuthority: Pubkey of the stake pool's withdraw authority.
+    *                                    PDA of the stake pool program, see StakePool docs for details.
+    * @param reserveStake: Pubkey of the stake pool's reserve account
+    * @param lamportsFrom: Pubkey of the SOL account to deduct SOL from to deposit.
+    * @param poolTokensTo: Pubkey of the pool token account to mint the pool tokens to.
+    * @param managerFeeAccount: Pubkey of the pool token account receiving the stake pool's fees.
+    * @param referrerPoolTokensAccount: Pubkey of the pool token account of the referrer to receive referral fees
+    * @param poolMint: Pubkey of the pool token mint
+    * @param tokenProgramId: Pubkey of the SPL token program
+    *
+    * @param amount: The amount of lamports to deposit
+    *
+    * @param solDepositAuthority: Optional Pubkey of the stake pool's deposit authority.
+    */
+
+    const stakepool = await this.getStakePoolAccount();
+    if (stakepool === null) return null;
+    const ix = depositSolInstruction(
+      this.config.stakePoolProgramId,
+      this.config.stakePoolAccountPubkey,
+      // TODO: stakePoolWithdrawAuthority,
+      stakepool.account.data.reserveStake,
+      // TODO: lamportsFrom,
+      // TODO: poolTokenTo,
+      stakepool.account.data.managerFeeAccount,
+      // TODO: referrerPoolTokensAcount,
+      stakepool.account.data.poolMint,
+      TOKEN_PROGRAM_ID,
+      amountLamports,
+      // TODO: solDepositAuthority,
+    );
+
+    tx.add(ix);
     return tx;
   }
 
@@ -53,24 +81,6 @@ export class Socean {
     if (account instanceof Error) return null;
     if (account === null) return null;
 
-    return this.getStakePoolFromAccountInfo(account);
-  }
-
-  private getStakePoolFromAccountInfo(
-    account: AccountInfo<Buffer>,
-  ): StakePoolAccount {
-    const stakePool = schema.StakePool.decodeUnchecked(account.data);
-    // reverse the pubkey fields (work-around for borsh.js)
-    reverse(stakePool);
-
-    return {
-      publicKey: this.config.stakePoolAccountPubkey,
-      account: {
-        data: stakePool,
-        executable: account.executable,
-        lamports: account.lamports,
-        owner: account.owner,
-      },
-    };
+    return getStakePoolFromAccountInfo(this.config.stakePoolAccountPubkey, account);
   }
 }

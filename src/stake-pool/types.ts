@@ -20,8 +20,6 @@ export interface StakePoolAccount {
 //  account: AccountInfo<schema.ValidatorList>;
 //}
 
-
-
 /**
  * Numerical enum for the different Stake Pool instructions
  * Note: this must match the order in instruction.rs in order

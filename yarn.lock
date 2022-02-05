@@ -2,7 +2,7 @@
 # yarn lockfile v1
 
 
-"@babel/runtime@^7.11.2", "@babel/runtime@^7.12.5":
+"@babel/runtime@^7.10.5", "@babel/runtime@^7.11.2", "@babel/runtime@^7.12.5":
   version "7.17.0"
   resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.17.0.tgz#b8d142fc0f7664fb3d9b5833fd40dcbab89276c0"
   integrity sha512-etcO/ohMNaNA2UBdaXBBSX/3aEzFMRrVfaPv8Ptc0k+cWpWW0QFiGZ2XnVqQZI1Cf734LbPGmqBKWESfW4x/dQ==
@@ -98,6 +98,38 @@
   integrity sha512-MVdgAKKL39tEs0l8je0hKaXLQFb7Rdfb0Xg2LjFZd8Lfdazkg6xiS98uAZrEKvaoF3i4M95ei9RydkGIDMeo3w==
   dependencies:
     buffer "~6.0.3"
+
+"@solana/spl-token@^0.1.8":
+  version "0.1.8"
+  resolved "https://registry.yarnpkg.com/@solana/spl-token/-/spl-token-0.1.8.tgz#f06e746341ef8d04165e21fc7f555492a2a0faa6"
+  integrity sha512-LZmYCKcPQDtJgecvWOgT/cnoIQPWjdH+QVyzPcFvyDUiT0DiRjZaam4aqNUyvchLFhzgunv3d9xOoyE34ofdoQ==
+  dependencies:
+    "@babel/runtime" "^7.10.5"
+    "@solana/web3.js" "^1.21.0"
+    bn.js "^5.1.0"
+    buffer "6.0.3"
+    buffer-layout "^1.2.0"
+    dotenv "10.0.0"
+
+"@solana/web3.js@^1.21.0":
+  version "1.33.0"
+  resolved "https://registry.yarnpkg.com/@solana/web3.js/-/web3.js-1.33.0.tgz#3b8c0b4cd259ffe8764937f1001f79958c5d9533"
+  integrity sha512-R53wvQQsUKCCJ9UmOfDlxCwC94jzjmpjr6wT/Xf1uFavZblSLAtzLaF4vbGIS465lk3mW6oJMtASd8cqSnr8Mw==
+  dependencies:
+    "@babel/runtime" "^7.12.5"
+    "@ethersproject/sha2" "^5.5.0"
+    "@solana/buffer-layout" "^3.0.0"
+    bn.js "^5.0.0"
+    borsh "^0.4.0"
+    bs58 "^4.0.1"
+    buffer "6.0.1"
+    cross-fetch "^3.1.4"
+    jayson "^3.4.4"
+    js-sha3 "^0.8.0"
+    rpc-websockets "^7.4.2"
+    secp256k1 "^4.0.2"
+    superstruct "^0.14.2"
+    tweetnacl "^1.0.0"
 
 "@solana/web3.js@^1.32.0":
   version "1.32.0"
@@ -411,7 +443,7 @@ bn.js@^4.11.9:
   resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-4.12.0.tgz#775b3f278efbb9718eec7361f483fb36fbbfea88"
   integrity sha512-c98Bf3tPniI+scsdk237ku1Dc3ujXQTSgyiPUDEOe7tRkhrqridvh8klBv0HCEso1OLOYcHuCv/cS6DNxKH+ZA==
 
-bn.js@^5.0.0, bn.js@^5.2.0:
+bn.js@^5.0.0, bn.js@^5.1.0, bn.js@^5.2.0:
   version "5.2.0"
   resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-5.2.0.tgz#358860674396c6997771a9d051fcc1b57d4ae002"
   integrity sha512-D7iWRBvnZE8ecXiLj/9wbxH7Tk79fAh8IHaTNq1RWRixsS02W+5qS+iE9yq6RYl0asXx5tw0bLhmT5pIfbSquw==
@@ -472,7 +504,7 @@ buffer-from@^1.0.0, buffer-from@^1.1.0:
   resolved "https://registry.yarnpkg.com/buffer-from/-/buffer-from-1.1.2.tgz#2b146a6fd72e80b4f55d255f35ed59a3a9a41bd5"
   integrity sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==
 
-buffer-layout@^1.2.2:
+buffer-layout@^1.2.0, buffer-layout@^1.2.2:
   version "1.2.2"
   resolved "https://registry.yarnpkg.com/buffer-layout/-/buffer-layout-1.2.2.tgz#b9814e7c7235783085f9ca4966a0cfff112259d5"
   integrity sha512-kWSuLN694+KTk8SrYvCqwP2WcgQjoRCiF5b4QDvkkz8EmgD+aWAIceGFKMIAdmF/pH+vpgNV3d3kAKorcdAmWA==
@@ -485,7 +517,7 @@ buffer@6.0.1:
     base64-js "^1.3.1"
     ieee754 "^1.2.1"
 
-buffer@^6.0.3, buffer@~6.0.3:
+buffer@6.0.3, buffer@^6.0.3, buffer@~6.0.3:
   version "6.0.3"
   resolved "https://registry.yarnpkg.com/buffer/-/buffer-6.0.3.tgz#2ace578459cc8fbe2a70aaa8f52ee63b6a74c6c6"
   integrity sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==
@@ -647,6 +679,11 @@ doctrine@^3.0.0:
   integrity sha512-yS+Q5i3hBf7GBkd4KG8a7eBNNWNGLTaEwwYWUijIYM7zrlYDM0BFXHjjPWlWZ1Rg7UaddZeIDmi9jF3HmqiQ2w==
   dependencies:
     esutils "^2.0.2"
+
+dotenv@10.0.0:
+  version "10.0.0"
+  resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-10.0.0.tgz#3d4227b8fb95f81096cdd2b66653fb2c7085ba81"
+  integrity sha512-rlBi9d8jpv9Sf1klPjNfFAuWDjKLwTIJJ/VxtoTwIR6hnZxcEOQCZg2oIL3MWBYw5GpUDKOEnND7LXTbIpQ03Q==
 
 elliptic@^6.5.4:
   version "6.5.4"
