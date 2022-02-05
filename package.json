@@ -1,9 +1,9 @@
 {
-  "name": "socean-ts-sdk",
+  "name": "@soceanfi/stake-pool-sdk",
   "version": "0.0.1",
   "description": "Socean Stake Pool Typescript SDK",
   "author": "socean finance <socean@socean.fi>",
-  "repository": "https://github.com/igneous-labs/socean-ts-sdk",
+  "repository": "https://github.com/igneous-labs/stake-pool-sdk",
   "license": "MIT",
   "keywords": [
     "socean.fi",
@@ -49,8 +49,10 @@
   },
   "dependencies": {
     "@solana/web3.js": "^1.32.0",
+    "@types/yargs": "^17.0.8",
     "borsh": "^0.7.0",
     "buffer": "^6.0.3",
-    "buffer-layout": "^1.2.2"
+    "buffer-layout": "^1.2.2",
+    "yargs": "^17.3.1"
   }
 }
