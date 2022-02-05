@@ -1,9 +1,3 @@
-// DELETEME:
-export const foo = async (): Promise<boolean> => {
-  console.log('Hello, world');
-  return true;
-}
-
 //import { Provider, Wallet, web3 } from '@project-serum/anchor';
 
 import {
@@ -16,20 +10,10 @@ import {
 
 import { tryAwait } from "./err";
 
-
+import { SoceanConfig, ClusterType } from "./config";
 import * as schema from "./schema";
 import { addStakePoolSchema } from "./schema";
 addStakePoolSchema(SOLANA_SCHEMA);
-
-// DELETEME:
-const testnetStakePoolAccountString = "5oc4nDMhYqP8dB5DW8DHtoLJpcasB19Tacu3GWAMbQAC";
-const mainnetStakePoolAccountString = "5oc4nmbNTda9fx8Tw57ShLD132aqDK65vuHH4RU1K4LZ";
-
-// constants
-const CONNECTION = new Connection(clusterApiUrl('testnet'));
-const STAKEPOOL_ACCOUNT_PUBKEY: PublicKey = new PublicKey(testnetStakePoolAccountString);
-//const CONNECTION = new Connection(clusterApiUrl('mainnet-beta'));
-//const STAKEPOOL_ACCOUNT_PUBKEY: PublicKey = new PublicKey(mainnetStakePoolAccountString);
 
 export interface StakePoolAccount {
   publicKey: PublicKey;
@@ -60,13 +44,19 @@ export function reverse(object: any) {
 }
 
 export class Socean {
+  private readonly config: SoceanConfig;
+
+  constructor(clusterType: ClusterType = 'testnet') {
+      this.config = new SoceanConfig(clusterType);
+  }
+
   /**
    * Retrieves and deserializes a StakePool account
    * @param connection: An active web3js connection.
    * @param stakePoolPubKey: The public key (address) of the stake pool account.
    */
   async getStakePoolAccount(): Promise<StakePoolAccount | null> {
-    const account = await tryAwait(CONNECTION.getAccountInfo(STAKEPOOL_ACCOUNT_PUBKEY));
+    const account = await tryAwait(this.config.connection.getAccountInfo(this.config.stakePoolAccountPubkey));
     if (account instanceof Error) return null;
     if (account === null) return null;
 
@@ -81,7 +71,7 @@ export class Socean {
     reverse(stakePool);
 
     return {
-      publicKey: STAKEPOOL_ACCOUNT_PUBKEY,
+      publicKey: this.config.stakePoolAccountPubkey,
       account: {
         data: stakePool,
         executable: account.executable,
@@ -90,4 +80,5 @@ export class Socean {
       },
     };
   }
+
 }
