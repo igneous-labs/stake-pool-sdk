@@ -1,3 +1,8 @@
+/**
+ * SoceanConfig class
+ *
+ * @module
+ */
 import {
   Connection,
   PublicKey,
