@@ -16,7 +16,7 @@ describe('test basic functionalities', () => {
 
   it('it deposits sol', async () => {
     const socean = new Socean();
-    const res = await socean.depositSol(1);
+    const res = await socean.depositSol(new BN(1));
     console.log(res);
   });
 });

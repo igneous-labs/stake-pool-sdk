@@ -2,7 +2,7 @@
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 
-import { Socean } from './main';
+import { Socean } from '.';
 
 const SOCEAN = new Socean();
 
