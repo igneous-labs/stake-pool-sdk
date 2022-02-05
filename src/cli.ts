@@ -13,8 +13,7 @@ const getStakePoolAccount = async (argv) => {
     console.log(await SOCEAN.getStakePoolAccount());
 };
 
-/*eslint no-empty-function: ["error", { "allow": ["arrowFunctions"] }]*/
-/*eslint-env es6*/
+// eslint-disable-next-line @typescript-eslint/no-empty-function
 const noOp = () => {}; // used to indicate "no operation" for arg parsing
 
 yargs(hideBin(process.argv))
