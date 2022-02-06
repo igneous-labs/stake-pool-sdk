@@ -11,9 +11,11 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 
-import { StakePoolAccount } from './types';
+import BN = require('bn.js');
+
+import { StakePoolAccount, ValidatorListAccount } from './types';
 import * as schema from "./schema";
-import { addStakePoolSchema } from "./schema";
+import { addStakePoolSchema, ValidatorStakeInfo, ValidatorList } from "./schema";
 addStakePoolSchema(SOLANA_SCHEMA);
 
 export function reverse(object: any) {
@@ -33,6 +35,17 @@ export function reverse(object: any) {
     }*/
   }
 }
+/**
+ * A generic helper function that splits an array into chunks
+ * @param arr array to split
+ * @param n the number of items in each chunk
+ */
+export const chunk = <T>(arr: T[], n: number): T[][] =>
+  arr.reduce((acc: T[][], item: T, idx: number) => {
+    const m = Math.floor(idx/n);
+    acc[m] = ([] as T[]).concat(acc[m] || [], item);
+    return acc;
+  }, [] as T[][]);
 
 /**
  * Parses stake pool account info into StakePoolAccount
@@ -60,6 +73,169 @@ export function getStakePoolFromAccountInfo(
     },
   };
 }
+
+export function getValidatorListFromAccountInfo(
+  pubkey: PublicKey,
+  account: AccountInfo<Buffer>,
+): ValidatorListAccount {
+  const validatorList = schema.ValidatorList.decodeUnchecked(account.data);
+  // reverse the pubkey fields (work-around for borsh.js)
+  reverse(validatorList);
+
+  return {
+    publicKey: pubkey,
+    account: {
+      data: validatorList,
+      executable: account.executable,
+      lamports: account.lamports,
+      owner: account.owner,
+    },
+  };
+}
+
+
+// TODO: any
+// TODO: do we need to handle deposit fee in any way? or in the context of SDK withdrawal is the only thing?
+export const calcPoolPriceAndFee = (stakePoolData: any): [number, number] => {
+  const lamports = stakePoolData.totalStakeLamports.toNumber();
+  const poolTokens = stakePoolData.poolTokenSupply.toNumber();
+  const price = lamports == 0 || poolTokens == 0 ? 1 : lamports / poolTokens;
+  const feeNum = stakePoolData.withdrawalFee.numerator.toNumber()
+  const feeDenom = stakePoolData.withdrawalFee.denominator.toNumber();
+  const withdrawalFee = feeNum / feeDenom;
+  return [price, withdrawalFee];
+}
+
+
+
+/**
+ * Algorithm to select which validators to withdraw from and how much from each
+ *
+ * @param withdrawalAmountDroplets: amount to withdraw in droplets
+ * @param withdrawalAmountLamports: total amount to deduct from all involved validator stake accounts in lamports
+ * @param validatorList: ValidatorList account data
+ * @param reserve: Pubkey of the stake pool's reserve account
+ *
+ * @returns: array of [PublicKey, number] tuples, where
+ *           [0] - pubkey of validator's stake account. Note: NOT vote account
+ *           [1] - amount in SOCN to withdraw from that validator. Sum of all these must = withdrawalAmount
+ *           Pass this array directly to StakePoolClient.withdrawStake()
+ *
+ *           Returns [[reserveAccPubkey, withdrawalAmountSocn]] if withdrawing from reserve account
+ *           Returns null if algorithm is unable to fulfil request
+ */
+export async function validatorsToWithdrawFrom(
+  stakePoolProgramAddress: PublicKey,
+  stakePoolPubkey: PublicKey,
+  withdrawalAmountDroplets: number,
+  withdrawalAmountLamports: number,
+  validatorList: ValidatorList,
+  reserve: PublicKey,
+): Promise<[PublicKey, number][] | null> {
+  // For now just pick the validator with the largest stake
+  const validators = validatorList.validators;
+  // no active validators, withdraw from reserve
+  // also, reduce() throws error if array empty
+  if (validators.length < 1) return [[reserve, withdrawalAmountDroplets]];
+
+  const sortedValidators = sortedValidatorStakeInfos(validators);
+  const heaviest = sortedValidators[0];
+
+  const available = stakeAvailableToWithdraw(heaviest);
+  if (available.eq(new BN(0))) {
+    return [[reserve, withdrawalAmountDroplets]];
+  }
+  if (available.lt(new BN(withdrawalAmountLamports))) {
+    return null;
+  }
+  const isTransient = heaviest.activeStakeLamports.eq(new BN(0));
+  const stakeAcc = await (isTransient
+    ? getValidatorTransientStakeAccount(
+        stakePoolProgramAddress,
+        stakePoolPubkey,
+        heaviest.voteAccountAddress,
+      )
+    : getValidatorStakeAccount(
+        stakePoolProgramAddress,
+        stakePoolPubkey,
+        heaviest.voteAccountAddress,
+      ));
+  return [[stakeAcc, withdrawalAmountDroplets]];
+}
+
+export function sortedValidatorStakeInfos(
+  validatorStakeInfos: ValidatorStakeInfo[],
+): ValidatorStakeInfo[] {
+  function compareValidatorStake(
+    validatorA: ValidatorStakeInfo,
+    validatorB: ValidatorStakeInfo,
+  ): number {
+    return validatorA.activeStakeLamports.gt(validatorB.activeStakeLamports)
+      ? -1
+      : validatorA.activeStakeLamports.lt(validatorB.activeStakeLamports)
+      ? 1
+      : validatorA.transientStakeLamports.gt(validatorB.transientStakeLamports)
+      ? -1
+      : 1;
+  }
+  return [...validatorStakeInfos].sort(compareValidatorStake);
+}
+
+export function stakeAvailableToWithdraw(validator: ValidatorStakeInfo): BN {
+  return validator.activeStakeLamports.gt(new BN(0))
+    ? validator.activeStakeLamports
+    : validator.transientStakeLamports;
+}
+
+export function validatorTotalStake(validator: ValidatorStakeInfo): BN {
+  return validator.activeStakeLamports.add(validator.transientStakeLamports);
+}
+
+
+
+/**
+ * Gets the address of the stake pool's stake account for the given validator
+ * @param stakePoolProgramId: Pubkey of the stake pool program
+ * @param stakePool: Pubkey of the stake pool to deposit to
+ * @param validatorVoteAccount: Pubkey of the validator to find the stake account of
+ */
+export async function getValidatorStakeAccount(
+  stakePoolProgramId: PublicKey,
+  stakePool: PublicKey,
+  validatorVoteAccount: PublicKey,
+): Promise<PublicKey> {
+  const [key, _bump_seed] = await PublicKey.findProgramAddress(
+    [validatorVoteAccount.toBuffer(), stakePool.toBuffer()],
+    stakePoolProgramId,
+  );
+  return key;
+}
+
+/**
+ * Gets the address of the stake pool's transient stake account for the given validator
+ * @param stakePoolProgramId: Pubkey of the stake pool program
+ * @param stakePool: Pubkey of the stake pool to deposit to
+ * @param validatorVoteAccount: Pubkey of the validator to find the stake account of
+ */
+export async function getValidatorTransientStakeAccount(
+  stakePoolProgramId: PublicKey,
+  stakePool: PublicKey,
+  validatorVoteAccount: PublicKey,
+): Promise<PublicKey> {
+  const [key, _bump_seed] = await PublicKey.findProgramAddress(
+    [
+      Buffer.from("transient"),
+      validatorVoteAccount.toBuffer(),
+      stakePool.toBuffer(),
+    ],
+    stakePoolProgramId,
+  );
+  return key;
+}
+
+
+
+
 
 const FAILED_TO_FIND_ACCOUNT = "Failed to find account";
 const INVALID_ACCOUNT_OWNER = "Invalid account owner";

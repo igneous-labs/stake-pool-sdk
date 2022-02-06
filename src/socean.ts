@@ -7,13 +7,16 @@ import { Transaction, PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 import { SoceanConfig, ClusterType } from "./config";
-import { StakePoolAccount, Numberu64 } from "./stake-pool/types";
+import { ValidatorListAccount, StakePoolAccount, Numberu64 } from "./stake-pool/types";
 import {
   getStakePoolFromAccountInfo,
+  getValidatorListFromAccountInfo,
   getOrCreateAssociatedAddress,
   getAssociatedTokenAddress,
   getWithdrawAuthority,
   getDefaultDepositAuthority,
+  validatorsToWithdrawFrom,
+  calcPoolPriceAndFee,
 } from "./stake-pool/helpers";
 import { tryAwait } from "./stake-pool/err";
 import { depositSolInstruction, withdrawStakeInstruction } from "./stake-pool/instructions";
@@ -64,39 +67,70 @@ export class Socean {
     return tx;
   }
 
-//  async withdraw(walletPubkey: PublicKey, amountLamports: Numberu64): Promise<Transaction | null> {
-//    const stakePool = await this.getStakePoolAccount();
-//    if (stakePool === null) return null;
-//
-//    // TODO: get ValidatorListAccount
-//    // TODO: for withdrawal from multiple validator, create tx for a set of validator
-//    // in Validator list until the sum of withdraw amount from each validator selected
-//    // is equal to the amountLamports.
-//    // TODO: decide on the return type API (return an array of txs?)
-//    const tx = new Transaction();
-//
-//    // get associated token account for scnSOL
-//    const userPoolTokenAccount = await getAssociatedTokenAddress(stakePool.account.data.poolMint, walletPubkey);
-//    const stakePoolWithdrawAuthority = await getWithdrawAuthority(this.config.stakePoolProgramId, this.config.stakePoolAccountPubkey);
-//    //const ix = withdrawStakeInstruction(
-//    //  this.config.stakePoolProgramId,
-//    //  this.config.stakePoolAccountPubkey,
-//    //  stakePool.account.data.validatorList,
-//    //  stakePoolWithdrawAuthority,
-//    //  // TODO: stakeSplitFrom,
-//    //  // TODO: stakeSplitTo,
-//    //  // TODO: userStakeAuthority,
-//    //  // TODO: userTokenTransferAuthority,
-//    //  userPoolTokenAccount,
-//    //  stakePool.account.data.managerFeeAccount,
-//    //  stakePool.account.data.poolMint,
-//    //  TOKEN_PROGRAM_ID,
-//    //  amountLamports,
-//    //);
-//    //tx.add(ix);
-//
-//    return tx;
-//  }
+  // NOTE: amountDroplets is in type Numberu64 to enforce it to be in the unit of droplets (lamports)
+  async withdraw(walletPubkey: PublicKey, amountDroplets: Numberu64): Promise<Transaction[] | null> {
+    const stakePoolData = (await this.getStakePoolAccount())?.account.data;
+    if (stakePoolData == null) return null;
+
+    // get ValidatorListAccount
+    const validatorListAcc = await this.getValidatorListAccount(stakePoolData.validatorList);
+    if (validatorListAcc === null) return null;
+
+    // get price and fee information and calculate the amounts
+    const [price, fee] = calcPoolPriceAndFee(stakePoolData);
+    const fromAmountDroplets = amountDroplets.toNumber();
+    const toAmountLamports = (1 - fee) * (fromAmountDroplets * price);
+
+    // TODO: WIP
+    // TODO: for withdrawal from multiple validator, create tx for a set of validator
+    // in Validator list until the sum of withdraw amount from each validator selected
+    // is equal to the amountLamports.
+    //
+    // TODO: The original code from the frontend calls the return of the
+    // `validatorsToWithdrawFrom` `amounts` which is very confusing. Call it something else.
+    //
+    // Returns [[reserveAccPubkey, withdrawalAmountSocn]] if withdrawing from reserve account
+    // Returns null if algorithm is unable to fulfil request
+    const amounts = await validatorsToWithdrawFrom(
+      new PublicKey(this.config.stakePoolProgramId),
+      new PublicKey(this.config.stakePoolAccountPubkey),
+      fromAmountDroplets,
+      toAmountLamports,
+      validatorListAcc.account.data,
+      stakePoolData.reserveStake,
+    );
+    if (amounts === null) return null;
+
+    console.log(walletPubkey);
+    //console.log(JSON.stringify(validatorListAcc, null, 4));
+    //return null;
+
+
+    // TODO: decide on the return type API (return an array of txs?)
+    const tx = new Transaction();
+
+    // get associated token account for scnSOL
+    // const userPoolTokenAccount = await getAssociatedTokenAddress(stakePoolData.poolMint, walletPubkey);
+    // const stakePoolWithdrawAuthority = await getWithdrawAuthority(this.config.stakePoolProgramId, this.config.stakePoolAccountPubkey);
+    // const ix = withdrawStakeInstruction(
+    //   this.config.stakePoolProgramId,
+    //   this.config.stakePoolAccountPubkey,
+    //   stakePoolData.validatorList,
+    //   stakePoolWithdrawAuthority,
+    //   // TODO: stakeSplitFrom,
+    //   // TODO: stakeSplitTo,
+    //   // TODO: userStakeAuthority,
+    //   // TODO: userTokenTransferAuthority,
+    //   userPoolTokenAccount,
+    //   stakePoolData.managerFeeAccount,
+    //   stakePoolData.poolMint,
+    //   TOKEN_PROGRAM_ID,
+    //   amountLamports,
+    // );
+    // tx.add(ix);
+
+    return [tx];
+  }
 
   /**
    * Retrieves and deserializes a StakePool account
@@ -107,5 +141,16 @@ export class Socean {
     if (account === null) return null;
 
     return getStakePoolFromAccountInfo(this.config.stakePoolAccountPubkey, account);
+  }
+
+  /**
+   * Retrieves and deserializes a StakePool account
+   */
+  async getValidatorListAccount(validatorListPubkey: PublicKey): Promise<ValidatorListAccount | null> {
+    const account = await tryAwait(this.config.connection.getAccountInfo(validatorListPubkey));
+    if (account instanceof Error) return null;
+    if (account === null) return null;
+
+    return getValidatorListFromAccountInfo(validatorListPubkey, account);
   }
 }
