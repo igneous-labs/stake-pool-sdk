@@ -27,7 +27,7 @@ export class Socean {
   /**
    * Returns Transaction that deposits sol into Socean stake pool
    */
-  async depositSol(walletPubkey: PublicKey, amountLamports: Numberu64, referrerPoolTokensAccount?: PublicKey): Promise<Transaction | null> {
+  async depositSol(walletPubkey: PublicKey, amountLamports: Numberu64, referrerPoolTokenAccount?: PublicKey): Promise<Transaction | null> {
     const stakepool = await this.getStakePoolAccount();
     if (stakepool === null) return null;
 
@@ -52,7 +52,7 @@ export class Socean {
       walletPubkey,
       poolTokenTo,
       stakepool.account.data.managerFeeAccount,
-      referrerPoolTokensAccount ?? stakepool.account.data.managerFeeAccount,
+      referrerPoolTokenAccount ?? stakepool.account.data.managerFeeAccount,
       stakepool.account.data.poolMint,
       TOKEN_PROGRAM_ID,
       amountLamports,

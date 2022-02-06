@@ -34,9 +34,9 @@ import { Numberu64, StakePoolInstruction } from "./types";
  *                                    PDA of the stake pool program, see StakePool docs for details.
  * @param reserveStake: Pubkey of the stake pool's reserve account
  * @param lamportsFrom: Pubkey of the SOL account to deduct SOL from to deposit.
- * @param poolTokensTo: Pubkey of the pool token account to mint the pool tokens to.
+ * @param poolTokenTo: Pubkey of the pool token account to mint the pool tokens to.
  * @param managerFeeAccount: Pubkey of the pool token account receiving the stake pool's fees.
- * @param referrerPoolTokensAccount: Pubkey of the pool token account of the referrer to receive referral fees
+ * @param referrerPoolTokenAccount: Pubkey of the pool token account of the referrer to receive referral fees
  * @param poolMint: Pubkey of the pool token mint
  * @param tokenProgramId: Pubkey of the SPL token program
  * @param amount: The amount of lamports to deposit
@@ -48,9 +48,9 @@ export const depositSolInstruction = (
   stakePoolWithdrawAuthority: PublicKey,
   reserveStake: PublicKey,
   lamportsFrom: PublicKey,
-  poolTokensTo: PublicKey,
+  poolTokenTo: PublicKey,
   managerFeeAccount: PublicKey,
-  referrerPoolTokensAccount: PublicKey,
+  referrerPoolTokenAccount: PublicKey,
   poolMint: PublicKey,
   tokenProgramId: PublicKey,
   amount: number | Numberu64,
@@ -80,9 +80,9 @@ export const depositSolInstruction = (
     },
     { pubkey: reserveStake, isSigner: false, isWritable: true },
     { pubkey: lamportsFrom, isSigner: true, isWritable: true },
-    { pubkey: poolTokensTo, isSigner: false, isWritable: true },
+    { pubkey: poolTokenTo, isSigner: false, isWritable: true },
     { pubkey: managerFeeAccount, isSigner: false, isWritable: true },
-    { pubkey: referrerPoolTokensAccount, isSigner: false, isWritable: true },
+    { pubkey: referrerPoolTokenAccount, isSigner: false, isWritable: true },
     { pubkey: poolMint, isSigner: false, isWritable: true },
     { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
