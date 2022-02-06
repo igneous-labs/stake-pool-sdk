@@ -1,5 +1,8 @@
-import { Socean } from '../src/main';
 import { strict as assert } from 'assert';
+import { Keypair } from '@solana/web3.js';
+import { Numberu64 } from '../src/stake-pool/types';
+
+import { Socean } from '../src';
 
 describe('test basic functionalities', () => {
   it('it initializes and gets stake pool account', async () => {
@@ -14,9 +17,12 @@ describe('test basic functionalities', () => {
     console.log(res);
   });
 
-  it('it deposits sol', async () => {
+  it('it generates deposit sol txs', async () => {
     const socean = new Socean();
-    const res = await socean.depositSol(new BN(1));
-    console.log(res);
+    const staker = Keypair.generate();
+    const referrer = Keypair.generate();
+
+    const txs = await socean.depositSol(staker.publicKey, new Numberu64(1), referrer.publicKey);
+    console.log(JSON.stringify(txs, null, 4));
   });
 });

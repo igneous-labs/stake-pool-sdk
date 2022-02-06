@@ -3,22 +3,19 @@
  *
  * @module
  */
-import {
-  AccountInfo,
-  Transaction,
-  SOLANA_SCHEMA,
-} from "@solana/web3.js";
-
-import BN from "bn.js"
-
-import * as schema from "./stake-pool/schema";
-import { addStakePoolSchema } from "./stake-pool/schema";
-addStakePoolSchema(SOLANA_SCHEMA);
+import { Transaction, PublicKey } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 import { SoceanConfig, ClusterType } from "./config";
+import { StakePoolAccount, Numberu64 } from "./stake-pool/types";
+import {
+  getStakePoolFromAccountInfo,
+  getOrCreateAssociatedAddress,
+  getWithdrawAuthority,
+  getDefaultDepositAuthority,
+} from  "./stake-pool/helpers";
 import { tryAwait } from "./stake-pool/err";
-import { StakePoolAccount } from './stake-pool/types';
-import { reverse } from './helpers';
+import { depositSolInstruction } from "./stake-pool/instructions";
 
 export class Socean {
   private readonly config: SoceanConfig;
@@ -28,22 +25,43 @@ export class Socean {
   }
 
   /**
-   * Deposits sol into Socean stake pool
+   * Returns Transaction that deposits sol into Socean stake pool
    */
-  async depositSol(amountLamports: BN, ): Promise<Transaction | null> {
-    const tx = new Transaction();
-    console.log(amountLamports);
+  async depositSol(walletPubkey: PublicKey, amountLamports: Numberu64, referrerPoolTokensAccount?: PublicKey): Promise<Transaction | null> {
+    const stakepool = await this.getStakePoolAccount();
+    if (stakepool === null) return null;
 
-    // check if the wallet public key as scnSOL associated token account
-    // if not create one
-    //tx.add();
+    const tx = new Transaction();
+
+    // get associated token account for scnSOL, if not exist create one
+    const poolTokenTo = await getOrCreateAssociatedAddress(
+      this.config.connection,
+      walletPubkey,
+      stakepool.account.data.poolMint,
+      tx
+    );
 
     // prep deposit sol instruction
-    //const ix = depositSolInstruction(amountLamports);
-    //tx.add();
+    const stakePoolWithdrawAuthority = await getWithdrawAuthority(this.config.stakePoolProgramId, this.config.stakePoolAccountPubkey);
+    const solDepositAuthority = await getDefaultDepositAuthority(this.config.stakePoolProgramId, this.config.stakePoolAccountPubkey);
+    const ix = depositSolInstruction(
+      this.config.stakePoolProgramId,
+      this.config.stakePoolAccountPubkey,
+      stakePoolWithdrawAuthority,
+      stakepool.account.data.reserveStake,
+      walletPubkey,
+      poolTokenTo,
+      stakepool.account.data.managerFeeAccount,
+      referrerPoolTokensAccount ?? stakepool.account.data.managerFeeAccount,
+      stakepool.account.data.poolMint,
+      TOKEN_PROGRAM_ID,
+      amountLamports,
+      solDepositAuthority,
+    );
+
+    tx.add(ix);
     return tx;
   }
-
 
   /**
    * Retrieves and deserializes a StakePool account
@@ -53,24 +71,6 @@ export class Socean {
     if (account instanceof Error) return null;
     if (account === null) return null;
 
-    return this.getStakePoolFromAccountInfo(account);
-  }
-
-  private getStakePoolFromAccountInfo(
-    account: AccountInfo<Buffer>,
-  ): StakePoolAccount {
-    const stakePool = schema.StakePool.decodeUnchecked(account.data);
-    // reverse the pubkey fields (work-around for borsh.js)
-    reverse(stakePool);
-
-    return {
-      publicKey: this.config.stakePoolAccountPubkey,
-      account: {
-        data: stakePool,
-        executable: account.executable,
-        lamports: account.lamports,
-        owner: account.owner,
-      },
-    };
+    return getStakePoolFromAccountInfo(this.config.stakePoolAccountPubkey, account);
   }
 }

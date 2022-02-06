@@ -3,7 +3,7 @@
  *
  * @module
  */
-import { Keypair, TransactionSignature } from "@solana/web3.js";
+//import { Keypair, TransactionSignature } from "@solana/web3.js";
 
 /**
  * Returns a Result-like struct representing
@@ -23,20 +23,20 @@ export async function tryAwait<T>(
   }
 }
 
-/**
- * Error class reprensenting a partially-filled withdraw-stake operation
- */
-export class PartialWithdrawalError extends Error {
-  completedTransactions: TransactionSignature[];
-  newStakeAccounts: Keypair[];
-
-  constructor(
-    msg: string,
-    completedTransactions: TransactionSignature[],
-    newStakeAccounts: Keypair[],
-  ) {
-    super(msg);
-    this.completedTransactions = completedTransactions;
-    this.newStakeAccounts = newStakeAccounts;
-  }
-}
+///**
+// * Error class reprensenting a partially-filled withdraw-stake operation
+// */
+//export class PartialWithdrawalError extends Error {
+//  completedTransactions: TransactionSignature[];
+//  newStakeAccounts: Keypair[];
+//
+//  constructor(
+//    msg: string,
+//    completedTransactions: TransactionSignature[],
+//    newStakeAccounts: Keypair[],
+//  ) {
+//    super(msg);
+//    this.completedTransactions = completedTransactions;
+//    this.newStakeAccounts = newStakeAccounts;
+//  }
+//}
