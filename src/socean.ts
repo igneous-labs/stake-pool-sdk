@@ -5,10 +5,9 @@
  */
 import { Transaction, PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import BN from "bn.js"
 
 import { SoceanConfig, ClusterType } from "./config";
-import { StakePoolAccount } from "./stake-pool/types";
+import { StakePoolAccount, Numberu64 } from "./stake-pool/types";
 import {
   getStakePoolFromAccountInfo,
   getOrCreateAssociatedAddress,
@@ -28,13 +27,13 @@ export class Socean {
   /**
    * Returns Transaction that deposits sol into Socean stake pool
    */
-  async depositSol(walletPubkey: PublicKey, amountLamports: BN, referrerPoolTokensAccount?: PublicKey): Promise<Transaction | null> {
+  async depositSol(walletPubkey: PublicKey, amountLamports: Numberu64, referrerPoolTokensAccount?: PublicKey): Promise<Transaction | null> {
     const stakepool = await this.getStakePoolAccount();
     if (stakepool === null) return null;
 
     const tx = new Transaction();
 
-    // get associated token account for scnSol, if not exist create one
+    // get associated token account for scnSOL, if not exist create one
     const poolTokenTo = await getOrCreateAssociatedAddress(
       this.config.connection,
       walletPubkey,
