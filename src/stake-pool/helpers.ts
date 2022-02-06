@@ -64,26 +64,30 @@ export function getStakePoolFromAccountInfo(
 const FAILED_TO_FIND_ACCOUNT = "Failed to find account";
 const INVALID_ACCOUNT_OWNER = "Invalid account owner";
 
-/**
- * Adds the create associated token address instruciton to `tx` if not already created
- * @param connection active connection
- * @param owner pubkey of the owner of the associated account
- * @param mint mint address of the token account
- * @param tx transaction to add create instruction to if need be
- * @returns the public key of the associated token account
- */
-export async function getOrCreateAssociatedAddress(
-  connection: Connection,
-  owner: PublicKey,
-  mint: PublicKey,
-  tx: Transaction,
-): Promise<PublicKey> {
-  const associatedAddress = await Token.getAssociatedTokenAddress(
+export async function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKey): Promise<PublicKey> {
+  return await Token.getAssociatedTokenAddress(
     ASSOCIATED_TOKEN_PROGRAM_ID,
     TOKEN_PROGRAM_ID,
     mint,
     owner,
   );
+}
+
+/**
+ * get associated token address and adds instruciton to create one to `tx` if not exist
+ * @param connection active connection
+ * @param mint mint address of the token account
+ * @param owner pubkey of the owner of the associated account
+ * @param tx transaction to add create instruction to if need be
+ * @returns the public key of the associated token account
+ */
+export async function getOrCreateAssociatedAddress(
+  connection: Connection,
+  mint: PublicKey,
+  owner: PublicKey,
+  tx: Transaction,
+): Promise<PublicKey> {
+  const associatedAddress = await getAssociatedTokenAddress(mint, owner);
 
   // This is the optimum logic, considering TX fee, client-side computation,
   // RPC roundtrips and guaranteed idempotent.

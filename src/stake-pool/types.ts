@@ -15,10 +15,10 @@ export interface StakePoolAccount {
   account: AccountInfo<schema.StakePool>;
 }
 
-//export interface ValidatorListAccount {
-//  publicKey: PublicKey;
-//  account: AccountInfo<schema.ValidatorList>;
-//}
+export interface ValidatorListAccount {
+  publicKey: PublicKey;
+  account: AccountInfo<schema.ValidatorList>;
+}
 
 /**
  * Numerical enum for the different Stake Pool instructions

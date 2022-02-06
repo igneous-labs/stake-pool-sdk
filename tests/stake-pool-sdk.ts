@@ -17,12 +17,20 @@ describe('test basic functionalities', () => {
     console.log(res);
   });
 
-  it('it generates deposit sol txs', async () => {
+  it('it generates deposit sol tx', async () => {
     const socean = new Socean();
     const staker = Keypair.generate();
     const referrer = Keypair.generate();
 
-    const txs = await socean.depositSol(staker.publicKey, new Numberu64(1), referrer.publicKey);
+    const tx = await socean.depositSol(staker.publicKey, new Numberu64(1), referrer.publicKey);
+    console.log(JSON.stringify(tx, null, 4));
+  });
+
+  it('it generates withdraw txs', async () => {
+    const socean = new Socean();
+    const staker = Keypair.generate();
+
+    const txs = await socean.withdraw(staker.publicKey, new Numberu64(1));
     console.log(JSON.stringify(txs, null, 4));
   });
 });
