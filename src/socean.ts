@@ -9,7 +9,12 @@ import BN from "bn.js"
 
 import { SoceanConfig, ClusterType } from "./config";
 import { StakePoolAccount } from "./stake-pool/types";
-import { getStakePoolFromAccountInfo } from  "./stake-pool/helpers";
+import {
+  getStakePoolFromAccountInfo,
+  getOrCreateAssociatedAddress,
+  getWithdrawAuthority,
+  getDefaultDepositAuthority,
+} from  "./stake-pool/helpers";
 import { tryAwait } from "./stake-pool/err";
 import { depositSolInstruction } from "./stake-pool/instructions";
 
@@ -23,30 +28,36 @@ export class Socean {
   /**
    * Returns Transaction that deposits sol into Socean stake pool
    */
-  async depositSol(amountLamports: BN, referrerPoolTokensAccount: PublicKey | null): Promise<Transaction | null> {
-    const tx = new Transaction();
-    console.log(amountLamports);
-
-    // TODO: check if the wallet public key as scnSOL associated token account
-    // if not create one
-    //tx.add();
-
-    // prep deposit sol instruction
+  async depositSol(walletPubkey: PublicKey, amountLamports: BN, referrerPoolTokensAccount?: PublicKey): Promise<Transaction | null> {
     const stakepool = await this.getStakePoolAccount();
     if (stakepool === null) return null;
+
+    const tx = new Transaction();
+
+    // get associated token account for scnSol, if not exist create one
+    const poolTokenTo = await getOrCreateAssociatedAddress(
+      this.config.connection,
+      walletPubkey,
+      stakepool.account.data.poolMint,
+      tx
+    );
+
+    // prep deposit sol instruction
+    const stakePoolWithdrawAuthority = await getWithdrawAuthority(this.config.stakePoolProgramId, this.config.stakePoolAccountPubkey);
+    const solDepositAuthority = await getDefaultDepositAuthority(this.config.stakePoolProgramId, this.config.stakePoolAccountPubkey);
     const ix = depositSolInstruction(
       this.config.stakePoolProgramId,
       this.config.stakePoolAccountPubkey,
-      // TODO: stakePoolWithdrawAuthority,
+      stakePoolWithdrawAuthority,
       stakepool.account.data.reserveStake,
-      // TODO: lamportsFrom,
-      // TODO: poolTokenTo,
+      walletPubkey,
+      poolTokenTo,
       stakepool.account.data.managerFeeAccount,
       referrerPoolTokensAccount ?? stakepool.account.data.managerFeeAccount,
       stakepool.account.data.poolMint,
       TOKEN_PROGRAM_ID,
       amountLamports,
-      // TODO: solDepositAuthority,
+      solDepositAuthority,
     );
 
     tx.add(ix);
