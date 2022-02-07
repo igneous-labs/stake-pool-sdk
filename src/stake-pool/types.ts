@@ -4,21 +4,29 @@
  * @module
  */
 
-import { AccountInfo, PublicKey } from "@solana/web3.js";
+import { AccountInfo, PublicKey, Transaction, Signer } from "@solana/web3.js";
 import assert from "assert";
 import BN from "bn.js";
 
 import * as schema from "./schema";
+
+// length of a stake account in bytes
+export const STAKE_STATE_LEN = 200;
 
 export interface StakePoolAccount {
   publicKey: PublicKey;
   account: AccountInfo<schema.StakePool>;
 }
 
-//export interface ValidatorListAccount {
-//  publicKey: PublicKey;
-//  account: AccountInfo<schema.ValidatorList>;
-//}
+export interface ValidatorListAccount {
+  publicKey: PublicKey;
+  account: AccountInfo<schema.ValidatorList>;
+}
+
+export type TransactionWithSigners = {
+  tx: Transaction;
+  signers: Signer[];
+};
 
 /**
  * Numerical enum for the different Stake Pool instructions
