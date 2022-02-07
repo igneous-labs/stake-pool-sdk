@@ -27,6 +27,7 @@ import {
 import { withdrawStakeInstruction } from "./instructions";
 import * as schema from "./schema";
 import { addStakePoolSchema, ValidatorStakeInfo, ValidatorList } from "./schema";
+import { RpcError, WithdrawalUnserviceableError } from "./err";
 addStakePoolSchema(SOLANA_SCHEMA);
 
 
@@ -123,7 +124,7 @@ export const calcPoolPriceAndFee = (stakePool: StakePoolAccount): [number, numbe
  *           Pass this array directly to StakePoolClient.withdrawStake()
  *
  *           Returns [[reserveAccPubkey, withdrawalAmountSocn]] if withdrawing from reserve account
- *           Returns null if algorithm is unable to fulfil request
+ * @throws WithdrawalUnserviceableError if a suitable withdraw procedure is not found
  */
 export async function validatorsToWithdrawFrom(
   stakePoolProgramAddress: PublicKey,
@@ -132,8 +133,9 @@ export async function validatorsToWithdrawFrom(
   withdrawalAmountLamports: number,
   validatorList: ValidatorList,
   reserve: PublicKey,
-): Promise<[PublicKey, number][] | null> {
+): Promise<[PublicKey, number][]> {
   // For now just pick the validator with the largest stake
+  // note: this means we cannot service withdrawls larger than that right now
   const validators = validatorList.validators;
   // no active validators, withdraw from reserve
   // also, reduce() throws error if array empty
@@ -147,7 +149,7 @@ export async function validatorsToWithdrawFrom(
     return [[reserve, withdrawalAmountDroplets]];
   }
   if (available.lt(new BN(withdrawalAmountLamports))) {
-    return null;
+    throw new WithdrawalUnserviceableError();
   }
   const isTransient = heaviest.activeStakeLamports.eq(new BN(0));
   const stakeAcc = await (isTransient
@@ -233,10 +235,6 @@ export async function getValidatorTransientStakeAccount(
   );
   return key;
 }
-
-
-const FAILED_TO_FIND_ACCOUNT = "Failed to find account";
-const INVALID_ACCOUNT_OWNER = "Invalid account owner";
 
 export async function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKey): Promise<PublicKey> {
   return await Token.getAssociatedTokenAddress(
@@ -368,7 +366,25 @@ export async function getWithdrawStakeTransactions(
   return [transactions, newStakeAccounts];
 }
 
-
+/**
+ * Wraps a fallible web3 rpc call, throwing an RpcError if it fails
+ * @returns result of the rpc call
+ * @throws RpcError
+ */
+export async function tryRpc<T>(
+  fallibleRpcCall: Promise<T>,
+): Promise<T> {
+  try {
+    const res = await fallibleRpcCall;
+    return res;
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      throw new RpcError(err);
+    } else {
+      throw err;
+    }
+  }
+}
 
 /**
  * get associated token address and adds instruciton to create one to `tx` if not exist
@@ -377,6 +393,7 @@ export async function getWithdrawStakeTransactions(
  * @param owner pubkey of the owner of the associated account
  * @param tx transaction to add create instruction to if need be
  * @returns the public key of the associated token account
+ * @throws RpcError
  */
 export async function getOrCreateAssociatedAddress(
   connection: Connection,
@@ -389,38 +406,23 @@ export async function getOrCreateAssociatedAddress(
   // This is the optimum logic, considering TX fee, client-side computation,
   // RPC roundtrips and guaranteed idempotent.
   // Sadly we can't do this atomically;
-  try {
-    const info = await connection.getAccountInfo(
-      associatedAddress,
+  const info = await tryRpc(connection.getAccountInfo(
+    associatedAddress,
+  ));
+  // possible for account owner to not be token program if the associatedAddress has
+  // already been received some lamports (= became system accounts).
+  // Assuming program derived addressing is safe, this is the only case for that
+  if (info === null || !info.owner.equals(TOKEN_PROGRAM_ID)) {
+    tx.add(
+      Token.createAssociatedTokenAccountInstruction(
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
+        mint,
+        associatedAddress,
+        owner,
+        owner,
+      ),
     );
-    if (info === null) {
-      throw new Error(FAILED_TO_FIND_ACCOUNT);
-    }
-    if (!info.owner.equals(TOKEN_PROGRAM_ID)) {
-      throw new Error(INVALID_ACCOUNT_OWNER);
-    }
-  } catch (err: unknown) {
-    if (err instanceof Error) {
-      // INVALID_ACCOUNT_OWNER can be possible if the associatedAddress has
-      // already been received some lamports (= became system accounts).
-      // Assuming program derived addressing is safe, this is the only case
-      // for the INVALID_ACCOUNT_OWNER in this code-path
-      if (
-        err.message === FAILED_TO_FIND_ACCOUNT ||
-        err.message === INVALID_ACCOUNT_OWNER
-      ) {
-        tx.add(
-          Token.createAssociatedTokenAccountInstruction(
-            ASSOCIATED_TOKEN_PROGRAM_ID,
-            TOKEN_PROGRAM_ID,
-            mint,
-            associatedAddress,
-            owner,
-            owner,
-          ),
-        );
-      }
-    }
   }
   return associatedAddress;
 }

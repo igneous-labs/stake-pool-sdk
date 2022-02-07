@@ -5,21 +5,37 @@
  */
 //import { Keypair, TransactionSignature } from "@solana/web3.js";
 
+import { PublicKey } from "@solana/web3.js";
+
 /**
- * Returns a Result-like struct representing
- * the success or error of a fallible promise
+ * Wrapper around solana rpc errors
  */
-export async function tryAwait<T>(
-  fallible_promise: Promise<T>,
-): Promise<T | Error> {
-  try {
-    return await fallible_promise;
-  } catch (err: unknown) {
-    console.log(err);
-    if (err instanceof Error) {
-      return err;
-    }
-    return new Error('Hmmm');
+export class RpcError extends Error {
+  constructor(err: Error) {
+    super(err.message);
+  }
+}
+
+/**
+ * Given account does not exist
+ */
+export class AccountDoesNotExistError extends Error {
+  readonly account: PublicKey
+
+  constructor(
+    account: PublicKey,
+  ) {
+    super(`Account ${account.toString()} does not exist`);
+    this.account = account;
+  }
+}
+
+/**
+ * The withdraw request is not serviceable (should never be thrown)
+ */
+export class WithdrawalUnserviceableError extends Error {
+  constructor() {
+    super("Could not determine withdrawal procedure");
   }
 }
 
