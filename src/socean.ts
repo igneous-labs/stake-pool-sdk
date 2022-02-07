@@ -12,14 +12,14 @@ import {
   getStakePoolFromAccountInfo,
   getValidatorListFromAccountInfo,
   getOrCreateAssociatedAddress,
-  getAssociatedTokenAddress,
   getWithdrawAuthority,
+  getWithdrawStakeTransactions,
   getDefaultDepositAuthority,
   validatorsToWithdrawFrom,
   calcPoolPriceAndFee,
-} from "./stake-pool/helpers";
+} from "./stake-pool/utils";
 import { tryAwait } from "./stake-pool/err";
-import { depositSolInstruction, withdrawStakeInstruction } from "./stake-pool/instructions";
+import { depositSolInstruction } from "./stake-pool/instructions";
 
 export class Socean {
   private readonly config: SoceanConfig;
@@ -69,15 +69,15 @@ export class Socean {
 
   // NOTE: amountDroplets is in type Numberu64 to enforce it to be in the unit of droplets (lamports)
   async withdraw(walletPubkey: PublicKey, amountDroplets: Numberu64): Promise<Transaction[] | null> {
-    const stakePoolData = (await this.getStakePoolAccount())?.account.data;
-    if (stakePoolData == null) return null;
+    const stakePool = await this.getStakePoolAccount();
+    if (stakePool == null) return null;
 
     // get ValidatorListAccount
-    const validatorListAcc = await this.getValidatorListAccount(stakePoolData.validatorList);
+    const validatorListAcc = await this.getValidatorListAccount(stakePool.account.data.validatorList);
     if (validatorListAcc === null) return null;
 
     // get price and fee information and calculate the amounts
-    const [price, fee] = calcPoolPriceAndFee(stakePoolData);
+    const [price, fee] = calcPoolPriceAndFee(stakePool);
     const fromAmountDroplets = amountDroplets.toNumber();
     const toAmountLamports = (1 - fee) * (fromAmountDroplets * price);
 
@@ -88,48 +88,32 @@ export class Socean {
     //
     // TODO: The original code from the frontend calls the return of the
     // `validatorsToWithdrawFrom` `amounts` which is very confusing. Call it something else.
-    //
-    // Returns [[reserveAccPubkey, withdrawalAmountSocn]] if withdrawing from reserve account
-    // Returns null if algorithm is unable to fulfil request
     const amounts = await validatorsToWithdrawFrom(
       new PublicKey(this.config.stakePoolProgramId),
       new PublicKey(this.config.stakePoolAccountPubkey),
       fromAmountDroplets,
       toAmountLamports,
       validatorListAcc.account.data,
-      stakePoolData.reserveStake,
+      stakePool.account.data.reserveStake,
     );
     if (amounts === null) return null;
 
     console.log(walletPubkey);
-    //console.log(JSON.stringify(validatorListAcc, null, 4));
-    //return null;
 
+    const [transactions, newStakeAccounts] = await getWithdrawStakeTransactions(
+      this.config.connection,
+      walletPubkey,
+      this.config.stakePoolProgramId,
+      stakePool,
+      validatorListAcc,
+      amounts,
+    );
 
-    // TODO: decide on the return type API (return an array of txs?)
-    const tx = new Transaction();
+    console.log(JSON.stringify(transactions, null, 4));
+    console.log(JSON.stringify(newStakeAccounts, null, 4));
 
-    // get associated token account for scnSOL
-    // const userPoolTokenAccount = await getAssociatedTokenAddress(stakePoolData.poolMint, walletPubkey);
-    // const stakePoolWithdrawAuthority = await getWithdrawAuthority(this.config.stakePoolProgramId, this.config.stakePoolAccountPubkey);
-    // const ix = withdrawStakeInstruction(
-    //   this.config.stakePoolProgramId,
-    //   this.config.stakePoolAccountPubkey,
-    //   stakePoolData.validatorList,
-    //   stakePoolWithdrawAuthority,
-    //   // TODO: stakeSplitFrom,
-    //   // TODO: stakeSplitTo,
-    //   // TODO: userStakeAuthority,
-    //   // TODO: userTokenTransferAuthority,
-    //   userPoolTokenAccount,
-    //   stakePoolData.managerFeeAccount,
-    //   stakePoolData.poolMint,
-    //   TOKEN_PROGRAM_ID,
-    //   amountLamports,
-    // );
-    // tx.add(ix);
-
-    return [tx];
+    // TODO: return type
+    return null;
   }
 
   /**

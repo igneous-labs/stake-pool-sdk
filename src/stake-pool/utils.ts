@@ -4,6 +4,10 @@ import {
   Transaction,
   SOLANA_SCHEMA,
   Connection,
+  Keypair,
+  SystemProgram,
+  StakeProgram,
+  Signer,
 } from "@solana/web3.js";
 import {
   Token,
@@ -13,10 +17,18 @@ import {
 
 import BN = require('bn.js');
 
-import { StakePoolAccount, ValidatorListAccount } from './types';
+import {
+  StakePoolAccount,
+  STAKE_STATE_LEN,
+  ValidatorListAccount,
+  TransactionWithSigners,
+  Numberu64,
+} from './types';
+import { withdrawStakeInstruction } from "./instructions";
 import * as schema from "./schema";
 import { addStakePoolSchema, ValidatorStakeInfo, ValidatorList } from "./schema";
 addStakePoolSchema(SOLANA_SCHEMA);
+
 
 export function reverse(object: any) {
   for (const val in object) {
@@ -35,17 +47,6 @@ export function reverse(object: any) {
     }*/
   }
 }
-/**
- * A generic helper function that splits an array into chunks
- * @param arr array to split
- * @param n the number of items in each chunk
- */
-export const chunk = <T>(arr: T[], n: number): T[][] =>
-  arr.reduce((acc: T[][], item: T, idx: number) => {
-    const m = Math.floor(idx/n);
-    acc[m] = ([] as T[]).concat(acc[m] || [], item);
-    return acc;
-  }, [] as T[][]);
 
 /**
  * Parses stake pool account info into StakePoolAccount
@@ -94,9 +95,9 @@ export function getValidatorListFromAccountInfo(
 }
 
 
-// TODO: any
 // TODO: do we need to handle deposit fee in any way? or in the context of SDK withdrawal is the only thing?
-export const calcPoolPriceAndFee = (stakePoolData: any): [number, number] => {
+export const calcPoolPriceAndFee = (stakePool: StakePoolAccount): [number, number] => {
+  const stakePoolData = stakePool.account.data;
   const lamports = stakePoolData.totalStakeLamports.toNumber();
   const poolTokens = stakePoolData.poolTokenSupply.toNumber();
   const price = lamports == 0 || poolTokens == 0 ? 1 : lamports / poolTokens;
@@ -234,9 +235,6 @@ export async function getValidatorTransientStakeAccount(
 }
 
 
-
-
-
 const FAILED_TO_FIND_ACCOUNT = "Failed to find account";
 const INVALID_ACCOUNT_OWNER = "Invalid account owner";
 
@@ -248,6 +246,129 @@ export async function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKe
     owner,
   );
 }
+
+
+/**
+ * Creates withdrawStake transactions
+ * given a list of stake pool validator stake accounts and number of pool tokens to withdraw for each
+ *
+ * NOTE: if the validator does not have any stake accounts, will withdraw directly from reserves instead.
+ * Fallible, caller must catch possible errors.
+ *
+ * @param connection active connection
+ * @param walletPubkey wallet to withdraw sol to
+ * @param stakePoolProgramId
+ * @param stakePool
+ * @param validatorList
+ * @param amounts: list of [Pubkey, number] tuples, where each tuple is
+ *                 [0]: Stake pool validator stake account
+ *                 [1]: amount of pool tokens to withdraw from that account
+ *
+ * @returns [Transaction[], Keypair[]] tuple, where
+ *          [0]: list of transactions for withdraw instruction
+ *          [1]: list of generated stake account keypairs.
+ *               A new stake account is created for each validator in `amounts`
+ */
+export async function getWithdrawStakeTransactions(
+  connection: Connection,
+  walletPubkey: PublicKey,
+  stakePoolProgramId: PublicKey,
+  stakePool: StakePoolAccount,
+  validatorList: ValidatorListAccount,
+  amounts: [PublicKey, number | Numberu64][],
+): Promise<[TransactionWithSigners[], Keypair[]]> {
+  // TODO: confirm this number
+  const MAX_WITHDRAWALS_PER_TX = 4;
+
+  const stakePoolData = stakePool.account.data;
+  const stakePoolWithdrawAuthority = await getWithdrawAuthority(
+    stakePoolProgramId,
+    stakePool.publicKey,
+  );
+
+  const lamportsReqStakeAcc =
+    await connection.getMinimumBalanceForRentExemption(
+      STAKE_STATE_LEN,
+    );
+
+  // since user is withdrawing, pool token acc should exist
+  const userPoolTokenAccount = await getAssociatedTokenAddress(stakePoolData.poolMint, walletPubkey);
+
+  const newStakeAccounts: Keypair[] = [];
+  const transactions: TransactionWithSigners[] = [];
+
+  for (
+    let chunkOffset = 0;
+    chunkOffset < amounts.length;
+    chunkOffset += MAX_WITHDRAWALS_PER_TX
+  ) {
+    const tx = new Transaction();
+    const partialSigners: Signer[] = [];
+
+    // Add WithdrawStake Instruction for each validator in the chunk
+    for (
+      let i = chunkOffset;
+      i < amounts.length && i < chunkOffset + MAX_WITHDRAWALS_PER_TX;
+      i++
+    ) {
+      const [stakeSplitFrom, amount] = amounts[i];
+      // create Approve instruction
+      // ephemeral key pair just to do the transfer
+      const userTokenTransferAuthority = Keypair.generate();
+      partialSigners.push(userTokenTransferAuthority);
+      tx.add(
+        Token.createApproveInstruction(
+          TOKEN_PROGRAM_ID,
+          userPoolTokenAccount,
+          userTokenTransferAuthority.publicKey,
+          walletPubkey,
+          [],
+          amount,
+        ),
+      );
+      // create blank stake account
+      const stakeSplitTo = Keypair.generate();
+      newStakeAccounts.push(stakeSplitTo);
+      tx.add(
+        SystemProgram.createAccount({
+          fromPubkey: walletPubkey,
+          lamports: lamportsReqStakeAcc,
+          newAccountPubkey: stakeSplitTo.publicKey,
+          programId: StakeProgram.programId,
+          space: STAKE_STATE_LEN,
+        }),
+      );
+      // The tx also needs to be signed by the new stake account's private key
+      partialSigners.push(stakeSplitTo);
+
+      tx.add(
+        withdrawStakeInstruction(
+          stakePoolProgramId,
+          stakePool.publicKey,
+          validatorList.publicKey,
+          stakePoolWithdrawAuthority,
+          stakeSplitFrom,
+          stakeSplitTo.publicKey,
+          walletPubkey,
+          userTokenTransferAuthority.publicKey,
+          userPoolTokenAccount,
+          stakePoolData.managerFeeAccount,
+          stakePoolData.poolMint,
+          TOKEN_PROGRAM_ID,
+          amount,
+        ),
+      );
+    }
+    transactions.push({
+      tx,
+      signers: partialSigners,
+    });
+  }
+
+  return [transactions, newStakeAccounts];
+}
+
+
 
 /**
  * get associated token address and adds instruciton to create one to `tx` if not exist
