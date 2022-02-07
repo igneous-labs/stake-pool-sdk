@@ -81,11 +81,6 @@ export class Socean {
     const fromAmountDroplets = amountDroplets.toNumber();
     const toAmountLamports = (1 - fee) * (fromAmountDroplets * price);
 
-    // TODO: WIP
-    // TODO: for withdrawal from multiple validator, create tx for a set of validator
-    // in Validator list until the sum of withdraw amount from each validator selected
-    // is equal to the amountLamports.
-    //
     // TODO: The original code from the frontend calls the return of the
     // `validatorsToWithdrawFrom` `amounts` which is very confusing. Call it something else.
     const amounts = await validatorsToWithdrawFrom(
