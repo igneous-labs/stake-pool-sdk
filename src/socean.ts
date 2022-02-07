@@ -3,11 +3,11 @@
  *
  * @module
  */
-import { Transaction, PublicKey } from "@solana/web3.js";
+import { Transaction, PublicKey, Keypair } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 import { SoceanConfig, ClusterType } from "./config";
-import { ValidatorListAccount, StakePoolAccount, Numberu64 } from "./stake-pool/types";
+import { ValidatorListAccount, StakePoolAccount, TransactionWithSigners, Numberu64 } from "./stake-pool/types";
 import {
   getStakePoolFromAccountInfo,
   getValidatorListFromAccountInfo,
@@ -68,7 +68,7 @@ export class Socean {
   }
 
   // NOTE: amountDroplets is in type Numberu64 to enforce it to be in the unit of droplets (lamports)
-  async withdraw(walletPubkey: PublicKey, amountDroplets: Numberu64): Promise<Transaction[] | null> {
+  async withdraw(walletPubkey: PublicKey, amountDroplets: Numberu64): Promise<[TransactionWithSigners[], Keypair[]] | null> {
     const stakePool = await this.getStakePoolAccount();
     if (stakePool == null) return null;
 
@@ -98,9 +98,8 @@ export class Socean {
     );
     if (amounts === null) return null;
 
-    console.log(walletPubkey);
 
-    const [transactions, newStakeAccounts] = await getWithdrawStakeTransactions(
+    return getWithdrawStakeTransactions(
       this.config.connection,
       walletPubkey,
       this.config.stakePoolProgramId,
@@ -108,12 +107,6 @@ export class Socean {
       validatorListAcc,
       amounts,
     );
-
-    console.log(JSON.stringify(transactions, null, 4));
-    console.log(JSON.stringify(newStakeAccounts, null, 4));
-
-    // TODO: return type
-    return null;
   }
 
   /**
