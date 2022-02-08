@@ -23,11 +23,6 @@ export interface ValidatorListAccount {
   account: AccountInfo<schema.ValidatorList>;
 }
 
-export type TransactionWithSigners = {
-  tx: Transaction;
-  signers: Signer[];
-};
-
 /**
  * Numerical enum for the different Stake Pool instructions
  * Note: this must match the order in instruction.rs in order

@@ -7,7 +7,7 @@ import { Transaction, PublicKey, Keypair } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 import { SoceanConfig, ClusterType } from "./config";
-import { ValidatorListAccount, StakePoolAccount, TransactionWithSigners, Numberu64 } from "./stake-pool/types";
+import { ValidatorListAccount, StakePoolAccount, Numberu64 } from "./stake-pool/types";
 import {
   getStakePoolFromAccountInfo,
   getValidatorListFromAccountInfo,
@@ -21,6 +21,7 @@ import {
 } from "./stake-pool/utils";
 import { AccountDoesNotExistError } from "./stake-pool/err";
 import { depositSolInstruction } from "./stake-pool/instructions";
+import { TransactionWithSigners } from "./transactions";
 
 export class Socean {
   private readonly config: SoceanConfig;
