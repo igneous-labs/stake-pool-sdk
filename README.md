@@ -34,20 +34,21 @@ $ yarn add @soceanfi/stake-pool-sdk
 ## Examples
 
 ### Initialization
+
+Import the main client class `Socean` and initialize it with the desired cluster type:
 ```ts
 import { Socean } from '@soceanfi/stake-pool-sdk';
 
-// initializes for testnet
-const socean = new Socean();
-
-// or for mainnet-beta
+// initializes for mainnet-beta
 const socean = new Socean('mainnet-beta');
+
+// or for testnet
+const socean = new Socean(); // or give 'testnet' as the argument
 ```
 
 
 ### Retreive on-chain state
 ```ts
-...
 const stakePoolAccount = socean.getStakePoolAccount();
 ```
 
