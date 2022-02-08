@@ -3,8 +3,6 @@
  *
  * @module
  */
-//import { Keypair, TransactionSignature } from "@solana/web3.js";
-
 import { PublicKey } from "@solana/web3.js";
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Custom TS types
+ * Custom types
  *
  * @module
  */

@@ -1,6 +1,8 @@
 /**
  * Socean class
  *
+ * Implements the client that interacts with Socean stake pool.
+ *
  * @module
  */
 import { Transaction, PublicKey, Keypair } from "@solana/web3.js";
@@ -31,10 +33,10 @@ export class Socean {
 
   /**
    * Creates a transaction that deposits sol into Socean stake pool
-   * @param walletPubkey SOL wallet to deposit SOL from
+   * @param walletPubkey user's SOL wallet to deposit SOL from
    * @param amountLamports amount to deposit in lamports
-   * @param referrerPoolTokenAccount PublicKey of the referrer for this deposit
-   * @returns the deposit transaction 
+   * @param referrerPoolTokenAccount scnSOL Token account of the referrer of this deposit
+   * @returns the deposit transaction
    * @throws RpcError
    * @throws AccountDoesNotExistError if stake pool does not exist
    */
@@ -74,7 +76,7 @@ export class Socean {
   }
 
   /**
-   * Creates the transactions to withdraw stake from the Socean stake pool
+   * Creates a set of transactions and signer keypairs for withdrawing stake from the Socean stake pool
    * and the new stake accounts to receive the withdrawn stake
    * @param walletPubkey the SOL wallet to withdraw stake to. scnSOL is deducted from this wallet's associated token account.
    * @param amountDroplets amount of scnSOL to withdraw in droplets (1 scnSOL = 10^9 droplets)
@@ -85,7 +87,6 @@ export class Socean {
    * @throws AccountDoesNotExistError if stake pool or validator list does not exist
    * @throws WithdrawalUnserviceableError if a suitable withdraw procedure is not found
    */
-  // NOTE: amountDroplets is in type Numberu64 to enforce it to be in the unit of droplets (lamports)
   async withdraw(walletPubkey: PublicKey, amountDroplets: Numberu64): Promise<[TransactionWithSigners[], Keypair[]]> {
     const stakePool = await this.getStakePoolAccount();
 
@@ -97,8 +98,7 @@ export class Socean {
     const fromAmountDroplets = amountDroplets.toNumber();
     const toAmountLamports = (1 - fee) * (fromAmountDroplets * price);
 
-    // TODO: The original code from the frontend calls the return of the
-    // `validatorsToWithdrawFrom` `amounts` which is very confusing. Call it something else.
+    // calculate the amounts to withdraw from for each validator
     const amounts = await validatorsToWithdrawFrom(
       new PublicKey(this.config.stakePoolProgramId),
       new PublicKey(this.config.stakePoolAccountPubkey),
@@ -107,7 +107,6 @@ export class Socean {
       validatorListAcc.account.data,
       stakePool.account.data.reserveStake,
     );
-
 
     return getWithdrawStakeTransactions(
       this.config.connection,
