@@ -37,15 +37,27 @@ $ yarn add @soceanfi/stake-pool-sdk
 ```ts
 import { Socean } from '@soceanfi/stake-pool-sdk';
 
+// initializes for testnet
 const socean = new Socean();
+
+// or for mainnet-beta
+const socean = new Socean('mainnet-beta');
 ```
 
-### Stake SOL and receive scnSOL
+
+### Retreive on-chain state
+```ts
+...
+const stakePoolAccount = socean.getStakePoolAccount();
+```
+
+
+### Stake SOL and Receive scnSOL
 ```ts
 ```
 
 
-### Unstake scnSOL and SOL
+### Unstake scnSOL and Receive SOL
 ```ts
 ```
 
