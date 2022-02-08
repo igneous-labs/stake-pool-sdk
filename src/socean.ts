@@ -103,7 +103,7 @@ export class Socean {
    * @throws WithdrawalUnserviceableError if a suitable withdraw procedure is not found
    */
   // NOTE: amountDroplets is in type Numberu64 to enforce it to be in the unit of droplets (lamports)
-  async withdraw(walletPubkey: PublicKey, amountDroplets: Numberu64): Promise<WithdrawReturn> {
+  async withdrawStake(walletPubkey: PublicKey, amountDroplets: Numberu64): Promise<WithdrawStakeReturn> {
     const stakePool = await this.getStakePoolAccount();
 
     // get ValidatorListAccount
@@ -318,7 +318,7 @@ export class Socean {
   }
 }
 
-type WithdrawReturn = {
+type WithdrawStakeReturn = {
   transactionSequence: TransactionSequence,
   stakeAccounts: Keypair[],
 }
