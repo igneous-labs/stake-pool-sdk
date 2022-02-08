@@ -5,9 +5,7 @@
  * @module
  */
 
-// use require to bypass lack of @types for buffer-layout
-/* eslint-disable */
-import BufferLayout = require("buffer-layout");
+import * as BufferLayout from "buffer-layout";
 
 /**
  * Layout for a public key

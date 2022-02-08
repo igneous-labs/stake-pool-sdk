@@ -1,5 +1,5 @@
 import { strict as assert } from 'assert';
-import { Keypair } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
 import { Numberu64 } from '../src/stake-pool/types';
 
 import { Socean } from '../src';
@@ -8,12 +8,14 @@ describe('test basic functionalities', () => {
   it('it initializes and gets stake pool account', async () => {
     const socean = new Socean();
     const res = await socean.getStakePoolAccount();
+    assert(res.account.data.poolMint.equals(new PublicKey("5oVNVwKYAGeFhvat29XFVH89oXNpLsV8uCPEqSooihsw")));
     console.log(res);
   });
 
   it('it initializes mainnet and gets stake pool account', async () => {
     const socean = new Socean('mainnet-beta');
     const res = await socean.getStakePoolAccount();
+    assert(res.account.data.poolMint.equals(new PublicKey("5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm")));
     console.log(res);
   });
 

@@ -4,9 +4,7 @@
  * @module
  */
 
-// use require to bypass lack of @types for buffer-layout
-// note: this means theres no type checking for BufferLayout stuff
-import BufferLayout = require("buffer-layout");
+import * as BufferLayout from "buffer-layout";
 
 import {
   PublicKey,
@@ -20,7 +18,7 @@ import {
 } from "@solana/web3.js";
 //import assert from "assert";
 
-import * as Layout from "./layout";
+import { uint64 } from "./layout";
 import { Numberu64, StakePoolInstruction } from "./types";
 
 /**
@@ -56,7 +54,7 @@ export const depositSolInstruction = (
 ): TransactionInstruction => {
   const dataLayout = BufferLayout.struct([
     BufferLayout.u8("instruction"),
-    Layout.uint64("amount"),
+    uint64("amount"),
   ]);
 
   const data = Buffer.alloc(dataLayout.span);
@@ -136,7 +134,7 @@ export function withdrawStakeInstruction(
 ): TransactionInstruction {
   const dataLayout = BufferLayout.struct([
     BufferLayout.u8("instruction"),
-    Layout.uint64("amount"),
+    uint64("amount"),
   ]);
 
   const data = Buffer.alloc(dataLayout.span);
