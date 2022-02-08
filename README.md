@@ -8,6 +8,7 @@ This SDK provide a client to interact with the staking protocol and allows you t
 
 (TODO: badges for project license, discord, npm version, size on npm)
 
+![Build]( https://github.com/igneous-labs/stake-pool-sdk/actions/workflows/main.yml/badge.svg)
 [![Discord](https://img.shields.io/discord/852171430089981982?label=discord&style=plastic)](https://discord.com/invite/socean)
 [![Twitter](https://img.shields.io/twitter/follow/soceanfinance?style=social)](https://twitter.com/SoceanFinance)
 
