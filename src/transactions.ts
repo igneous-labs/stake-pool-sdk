@@ -49,6 +49,7 @@ export type TransactionSequenceSignatures = Array<string[]>;
  * @param connection solana connection
  * @param feePayer public key paying for tx fees
  * @returns `TransactionSequenceSignatures` for all transactions in the `TransactionSequence`
+ * @throws RpcError
  */
 export async function signAndSendTransactionSequence(
   walletAdapter: SignerWalletAdapterProps,

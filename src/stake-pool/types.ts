@@ -129,3 +129,8 @@ export class Numberu64 extends BN {
     );
   }
 }
+
+export type ValidatorAllStakeAccounts = {
+  main: PublicKey,
+  transient: PublicKey,
+}

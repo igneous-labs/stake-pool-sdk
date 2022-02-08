@@ -15,13 +15,16 @@ import {
 //  SYSVAR_STAKE_HISTORY_PUBKEY,
   TransactionInstruction,
   StakeProgram,
+  Transaction,
+  SYSVAR_STAKE_HISTORY_PUBKEY,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
 //  SYSVAR_INSTRUCTIONS_PUBKEY,
 //  Transaction,
 } from "@solana/web3.js";
 //import assert from "assert";
 
 import * as Layout from "./layout";
-import { Numberu64, StakePoolInstruction } from "./types";
+import { Numberu64, StakePoolInstruction, ValidatorAllStakeAccounts } from "./types";
 
 /**
  * Initializes a DepositSol stake pool instruction given the required accounts and data
@@ -166,6 +169,147 @@ export function withdrawStakeInstruction(
     { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
     { pubkey: tokenProgramId, isSigner: false, isWritable: false },
     { pubkey: StakeProgram.programId, isSigner: false, isWritable: false },
+  ];
+
+  return new TransactionInstruction({
+    keys,
+    programId: stakePoolProgramId,
+    data,
+  });
+}
+
+/**
+ * Creates a transaction with a single UpdateValidatorListBalance instruction
+ * Since UpdateValidatorListBalance must be the sole instruction of any transaction,
+ * (there's a vulnerability if it isn't)
+ * we don't export the instruction directly, only a containing transaction
+ * @param stakePoolProgramId The stake pool prog
+ * @param stakePool 
+ * @param stakePoolWithdrawAuthority 
+ * @param validatorList 
+ * @param reserveStake 
+ * @param validatorStakeAccounts 
+ * @param startIndex 
+ * @param noMerge 
+ * @returns 
+ * @throws
+ */
+export function updateValidatorListBalanceTransaction(
+  stakePoolProgramId: PublicKey,
+  stakePool: PublicKey,
+  stakePoolWithdrawAuthority: PublicKey,
+  validatorList: PublicKey,
+  reserveStake: PublicKey,
+  validatorStakeAccounts: ValidatorAllStakeAccounts[],
+  startIndex: number,
+  noMerge: boolean,
+): Transaction {
+  const dataLayout = BufferLayout.struct([
+    BufferLayout.u8("instruction"),
+    BufferLayout.u32("startIndex"),
+    BufferLayout.u8("noMerge"), // no boolean type in BufferLayout
+  ]);
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: StakePoolInstruction.UpdateValidatorListBalance,
+      startIndex: startIndex,
+      noMerge: noMerge ? 1 : 0,
+    },
+    data,
+  );
+
+  const keys = [
+    { pubkey: stakePool, isSigner: false, isWritable: false },
+    { pubkey: stakePoolWithdrawAuthority, isSigner: false, isWritable: false },
+    { pubkey: validatorList, isSigner: false, isWritable: true },
+    { pubkey: reserveStake, isSigner: false, isWritable: true },
+    { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
+    { pubkey: SYSVAR_STAKE_HISTORY_PUBKEY, isSigner: false, isWritable: false },
+    { pubkey: StakeProgram.programId, isSigner: false, isWritable: false },
+    { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
+  ];
+  
+  for (const vsa of validatorStakeAccounts) {
+    const { main, transient } = vsa;
+    keys.push({
+      pubkey: main,
+      isSigner: false,
+      isWritable: true,
+    });
+    keys.push({
+      pubkey: transient,
+      isSigner: false,
+      isWritable: true,
+    });
+  }
+
+  return new Transaction().add(
+    new TransactionInstruction({
+      keys,
+      programId: stakePoolProgramId,
+      data,
+    }),
+  );
+}
+
+export function updateStakePoolBalanceInstruction(
+  stakePoolProgramId: PublicKey,
+  stakePool: PublicKey,
+  stakePoolWithdrawAuthority: PublicKey,
+  validatorList: PublicKey,
+  reserveStake: PublicKey,
+  managerFeeAccount: PublicKey,
+  poolMint: PublicKey,
+  tokenProgramId: PublicKey,
+): TransactionInstruction {
+  const dataLayout = BufferLayout.struct([BufferLayout.u8("instruction")]);
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: StakePoolInstruction.UpdateStakePoolBalance,
+    },
+    data,
+  );
+
+  const keys = [
+    { pubkey: stakePool, isSigner: false, isWritable: true },
+    { pubkey: stakePoolWithdrawAuthority, isSigner: false, isWritable: false },
+    { pubkey: validatorList, isSigner: false, isWritable: true },
+    { pubkey: reserveStake, isSigner: false, isWritable: false },
+    { pubkey: managerFeeAccount, isSigner: false, isWritable: true },
+    { pubkey: poolMint, isSigner: false, isWritable: true },
+    { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
+    { pubkey: tokenProgramId, isSigner: false, isWritable: false },
+  ];
+
+  return new TransactionInstruction({
+    keys,
+    programId: stakePoolProgramId,
+    data,
+  });
+}
+
+export function cleanupRemovedValidatorsInstruction(
+  stakePoolProgramId: PublicKey,
+  stakePool: PublicKey,
+  validatorList: PublicKey,
+): TransactionInstruction {
+  const dataLayout = BufferLayout.struct([BufferLayout.u8("instruction")]);
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: StakePoolInstruction.CleanupRemovedValidatorEntries,
+    },
+    data,
+  );
+
+  const keys = [
+    { pubkey: stakePool, isSigner: false, isWritable: false },
+    { pubkey: validatorList, isSigner: false, isWritable: true },
   ];
 
   return new TransactionInstruction({
