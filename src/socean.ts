@@ -36,7 +36,7 @@ export class Socean {
    * @param walletPubkey user's SOL wallet to deposit SOL from
    * @param amountLamports amount to deposit in lamports
    * @param referrerPoolTokenAccount scnSOL Token account of the referrer of this deposit
-   * @returns the deposit transaction
+   * @returns The deposit transaction
    * @throws RpcError
    * @throws AccountDoesNotExistError if stake pool does not exist
    */

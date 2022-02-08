@@ -1,3 +1,3 @@
 export { Socean } from './socean';
-export { ClusterType } from './config';
-export { Numberu64 } from "./stake-pool/types";
+export { SoceanConfig, ClusterType } from './config';
+export { StakePoolAccount, ValidatorListAccount, TransactionWithSigners, Numberu64 } from "./stake-pool/types";

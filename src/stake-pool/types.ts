@@ -10,19 +10,28 @@ import BN from "bn.js";
 
 import * as schema from "./schema";
 
-// length of a stake account in bytes
+/** length of the stake account in bytes */
 export const STAKE_STATE_LEN = 200;
 
+/**
+ * Deserialized representation of on-chain stake pool account
+ */
 export interface StakePoolAccount {
   publicKey: PublicKey;
   account: AccountInfo<schema.StakePool>;
 }
 
+/**
+ * Deserialized representation of on-chain validator list account
+ */
 export interface ValidatorListAccount {
   publicKey: PublicKey;
   account: AccountInfo<schema.ValidatorList>;
 }
 
+/**
+ * Wrapper type containing a transaction and associated signers of the transaction
+ */
 export type TransactionWithSigners = {
   tx: Transaction;
   signers: Signer[];
@@ -30,7 +39,7 @@ export type TransactionWithSigners = {
 
 /**
  * Numerical enum for the different Stake Pool instructions
- * Note: this must match the order in instruction.rs in order
+ * NOTE: this must match the order in instruction.rs in order
  * for their numerical value to correctly correspond.
  */
 export enum StakePoolInstruction {
@@ -58,7 +67,7 @@ export enum StakePoolInstruction {
 
 /**
  * Numerical enum for the different Stake Pool Errors
- * Note: this must match the order in error.rs in order
+ * NOTE: this must match the order in error.rs in order
  * for their numerical value to correctly correspond.
  */
 export enum StakePoolError {
