@@ -26,7 +26,7 @@ import {
 import { withdrawStakeInstruction } from "./instructions";
 import * as schema from "./schema";
 import { addStakePoolSchema, ValidatorStakeInfo, ValidatorList } from "./schema";
-import { RpcError, WithdrawalUnserviceableError } from "./err";
+import { RpcError, WithdrawalUnserviceableError } from "../err";
 import { TransactionWithSigners } from "../transactions";
 addStakePoolSchema(SOLANA_SCHEMA);
 

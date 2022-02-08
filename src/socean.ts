@@ -21,9 +21,10 @@ import {
   tryRpc,
   getValidatorStakeAccount,
 } from "./stake-pool/utils";
-import { AccountDoesNotExistError } from "./stake-pool/err";
+import { AccountDoesNotExistError, WalletPublicKeyUnavailableError } from "./err";
 import { cleanupRemovedValidatorsInstruction, depositSolInstruction, updateStakePoolBalanceInstruction, updateValidatorListBalanceTransaction } from "./stake-pool/instructions";
-import { TransactionSequence, TransactionWithSigners } from "./transactions";
+import { WalletAdapter, TransactionSequence, TransactionSequenceSignatures, TransactionWithSigners } from "./transactions";
+import { signAndSendTransactionSequence } from ".";
 
 export class Socean {
   private readonly config: SoceanConfig;
@@ -33,7 +34,39 @@ export class Socean {
   }
 
   /**
-   * Creates a `TransactionSequence` that deposits sol into Socean stake pool
+   * Signs, sends and confirms the transactions required to deposit SOL
+   * into the Socean stake pool
+   * @param walletAdapter SOL wallet to deposit SOL from
+   * @param amountLamports amount to deposit in lamports
+   * @param referrerPoolTokenAccount PublicKey of the referrer for this deposit
+   * @returns the transaction signatures of the transactions sent and confirmed
+   * @throws RpcError
+   * @throws AccountDoesNotExistError if stake pool does not exist
+   * @throws WalletPublicKeyUnavailableError
+   */
+  async depositSol(
+    walletAdapter: WalletAdapter,
+    amountLamports: Numberu64,
+    referrerPoolTokenAccount?: PublicKey,
+  ): Promise<TransactionSequenceSignatures> {
+    const walletPubkey = walletAdapter.publicKey;
+    if (!walletPubkey) throw new WalletPublicKeyUnavailableError();
+    const txSeq = await this.depositSolTransactions(
+      walletPubkey,
+      amountLamports,
+      referrerPoolTokenAccount,
+    );
+    return this.signAndSend(
+      walletAdapter,
+      txSeq
+    );
+  }
+
+  /**
+   * Creates a `TransactionSequence` that deposits SOL into Socean stake pool
+   * Each inner `TransactionWithSigners` array must be executed and confirmed
+   * before going to the next one.
+   * This is a lower-level API for compatibility, recommend using `depositSol()` instead if possible.
    * @param walletPubkey SOL wallet to deposit SOL from
    * @param amountLamports amount to deposit in lamports
    * @param referrerPoolTokenAccount PublicKey of the referrer for this deposit
@@ -41,7 +74,11 @@ export class Socean {
    * @throws RpcError
    * @throws AccountDoesNotExistError if stake pool does not exist
    */
-  async depositSol(walletPubkey: PublicKey, amountLamports: Numberu64, referrerPoolTokenAccount?: PublicKey): Promise<TransactionSequence> {
+  async depositSolTransactions(
+    walletPubkey: PublicKey,
+    amountLamports: Numberu64,
+    referrerPoolTokenAccount?: PublicKey
+  ): Promise<TransactionSequence> {
     const stakePool = await this.getStakePoolAccount();
 
     const tx = new Transaction();
@@ -91,8 +128,41 @@ export class Socean {
   }
 
   /**
+   * Signs, sends and confirms the transactions required to withdraw stake from the Socean stake pool
+   * @param walletAdapter the SOL wallet to withdraw stake to. scnSOL is deducted from this wallet's associated token account.
+   * @param amountDroplets amount of scnSOL to withdraw in droplets (1 scnSOL = 10^9 droplets)
+   * @returns the transaction signatures of the transactions sent and confirmed
+   *          and the newly created stake accounts to receive the withdrawn stake
+   * @throws RpcError
+   * @throws AccountDoesNotExistError if stake pool does not exist
+   * @throws WalletPublicKeyUnavailableError
+   */
+  async withdrawStake(
+    walletAdapter: WalletAdapter,
+    amountDroplets: Numberu64,
+  ): Promise<WithdrawStakeReturn> {
+    const walletPubkey = walletAdapter.publicKey;
+    if (!walletPubkey) throw new WalletPublicKeyUnavailableError();
+    const { transactionSequence, stakeAccounts } = await this.withdrawStakeTransactions(
+      walletPubkey,
+      amountDroplets,
+    );
+    const transactionSignatures = await this.signAndSend(
+      walletAdapter,
+      transactionSequence
+    );
+    return {
+      transactionSignatures,
+      stakeAccounts,
+    };
+  }
+
+  /**
    * Creates the transactions to withdraw stake from the Socean stake pool
    * and the new stake accounts to receive the withdrawn stake
+   * Each inner `TransactionWithSigners` array of `transactionSequence` must be executed and confirmed
+   * before going to the next one.
+   * This is a lower-level API for compatibility, recommend using `withdrawStake()` instead if possible.
    * @param walletPubkey the SOL wallet to withdraw stake to. scnSOL is deducted from this wallet's associated token account.
    * @param amountDroplets amount of scnSOL to withdraw in droplets (1 scnSOL = 10^9 droplets)
    * @returns `{transactionSequence, stakeAccounts}`, where
@@ -103,7 +173,7 @@ export class Socean {
    * @throws WithdrawalUnserviceableError if a suitable withdraw procedure is not found
    */
   // NOTE: amountDroplets is in type Numberu64 to enforce it to be in the unit of droplets (lamports)
-  async withdrawStake(walletPubkey: PublicKey, amountDroplets: Numberu64): Promise<WithdrawStakeReturn> {
+  async withdrawStakeTransactions(walletPubkey: PublicKey, amountDroplets: Numberu64): Promise<WithdrawStakeTransactionsReturn> {
     const stakePool = await this.getStakePoolAccount();
 
     // get ValidatorListAccount
@@ -146,6 +216,17 @@ export class Socean {
       );
     }
     return res;
+  }
+
+  private async signAndSend(
+    walletAdapter: WalletAdapter,
+    transactionSequence: TransactionSequence,
+  ): Promise<TransactionSequenceSignatures> {
+    return signAndSendTransactionSequence(
+      walletAdapter,
+      transactionSequence,
+      this.config.connection, 
+    );
   }
 
   /**
@@ -232,7 +313,7 @@ export class Socean {
       const chunk = voteAccounts.slice(i, end);
 
       const validatorsAllStakeAccounts = await Promise.all(
-        chunk.map(this.getValidatorAllStakeAccounts)
+        chunk.map((voteAccount) => this.getValidatorAllStakeAccounts(voteAccount))
       );
 
       res.push({
@@ -311,14 +392,21 @@ export class Socean {
    * given the validator's vote account
    */
   async getValidatorAllStakeAccounts(voteAccount: PublicKey): Promise<ValidatorAllStakeAccounts> {
+    const main = await this.validatorStakeAccount(voteAccount);
+    const transient = await this.transientStakeAccount(voteAccount);
     return {
-      main: await this.validatorStakeAccount(voteAccount),
-      transient: await this.transientStakeAccount(voteAccount),
+      main,
+      transient,
     };
   }
 }
 
-type WithdrawStakeReturn = {
+type WithdrawStakeTransactionsReturn = {
   transactionSequence: TransactionSequence,
+  stakeAccounts: Keypair[],
+}
+
+type WithdrawStakeReturn = {
+  transactionSignatures: TransactionSequenceSignatures,
   stakeAccounts: Keypair[],
 }

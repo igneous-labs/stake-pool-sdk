@@ -1,4 +1,5 @@
 import { Connection, PublicKey, sendAndConfirmRawTransaction, Signer, Transaction } from "@solana/web3.js";
+import { WalletPublicKeyUnavailableError } from "./err";
 import { tryRpc } from "./stake-pool/utils";
 
 export interface TransactionWithSigners {
@@ -20,10 +21,12 @@ function partialSign(transaction: TransactionWithSigners): Transaction {
 }
 
 /**
- * Copied from @solana/wallet-adapter-base
- * excluding signTransaction prop
+ * Copied from @solana/wallet-adapter-base\
+ * `WalletAdapterProps` &
+ * `SignerWalletAdapterProps` excluding signTransaction prop
  */
-export interface SignerWalletAdapterProps {
+export interface WalletAdapter {
+  publicKey: null | PublicKey;
   signAllTransactions(transaction: Transaction[]): Promise<Transaction[]>;
 }
 
@@ -47,17 +50,18 @@ export type TransactionSequenceSignatures = Array<string[]>;
  * @param walletAdapter wallet signing the transaction
  * @param transactionSequence `TransactionSequence` to sign and send
  * @param connection solana connection
- * @param feePayer public key paying for tx fees
  * @returns `TransactionSequenceSignatures` for all transactions in the `TransactionSequence`
  * @throws RpcError
+ * @throws WalletPublicKeyUnavailableError
  */
 export async function signAndSendTransactionSequence(
-  walletAdapter: SignerWalletAdapterProps,
+  walletAdapter: WalletAdapter,
   transactionSequence: TransactionSequence,
   connection: Connection,
-  feePayer: PublicKey,
 ): Promise<TransactionSequenceSignatures> {
   const res: TransactionSequenceSignatures = [];
+  const feePayer = walletAdapter.publicKey;
+  if (!feePayer) throw new WalletPublicKeyUnavailableError();
   for (const transactions of transactionSequence) {
     const signatures = await signSendConfirmTransactions(
       walletAdapter,
@@ -81,7 +85,7 @@ export async function signAndSendTransactionSequence(
  * @throws RpcError
  */
 async function signSendConfirmTransactions(
-  walletAdapter: SignerWalletAdapterProps,
+  walletAdapter: WalletAdapter,
   transactions: TransactionWithSigners[],
   connection: Connection,
   feePayer: PublicKey,
