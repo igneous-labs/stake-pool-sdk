@@ -21,13 +21,13 @@ import {
   StakePoolAccount,
   STAKE_STATE_LEN,
   ValidatorListAccount,
-  TransactionWithSigners,
   Numberu64,
 } from './types';
 import { withdrawStakeInstruction } from "./instructions";
 import * as schema from "./schema";
 import { addStakePoolSchema, ValidatorStakeInfo, ValidatorList } from "./schema";
-import { RpcError, WithdrawalUnserviceableError } from "./err";
+import { RpcError, WithdrawalUnserviceableError } from "../err";
+import { TransactionWithSigners } from "../transactions";
 addStakePoolSchema(SOLANA_SCHEMA);
 
 
@@ -95,8 +95,6 @@ export function getValidatorListFromAccountInfo(
   };
 }
 
-
-// TODO: do we need to handle deposit fee in any way? or in the context of SDK withdrawal is the only thing?
 export const calcPoolPriceAndFee = (stakePool: StakePoolAccount): [number, number] => {
   const stakePoolData = stakePool.account.data;
   const lamports = stakePoolData.totalStakeLamports.toNumber();
@@ -107,8 +105,6 @@ export const calcPoolPriceAndFee = (stakePool: StakePoolAccount): [number, numbe
   const withdrawalFee = feeNum / feeDenom;
   return [price, withdrawalFee];
 }
-
-
 
 /**
  * Algorithm to select which validators to withdraw from and how much from each
