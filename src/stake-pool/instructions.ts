@@ -12,16 +12,12 @@ import {
   PublicKey,
   SystemProgram,
   SYSVAR_CLOCK_PUBKEY,
-//  SYSVAR_STAKE_HISTORY_PUBKEY,
   TransactionInstruction,
   StakeProgram,
   Transaction,
   SYSVAR_STAKE_HISTORY_PUBKEY,
   SYSVAR_INSTRUCTIONS_PUBKEY,
-//  SYSVAR_INSTRUCTIONS_PUBKEY,
-//  Transaction,
 } from "@solana/web3.js";
-//import assert from "assert";
 
 import * as Layout from "./layout";
 import { Numberu64, StakePoolInstruction, ValidatorAllStakeAccounts } from "./types";
@@ -184,14 +180,14 @@ export function withdrawStakeInstruction(
  * (there's a vulnerability if it isn't)
  * we don't export the instruction directly, only a containing transaction
  * @param stakePoolProgramId The stake pool prog
- * @param stakePool 
- * @param stakePoolWithdrawAuthority 
- * @param validatorList 
- * @param reserveStake 
- * @param validatorStakeAccounts 
- * @param startIndex 
- * @param noMerge 
- * @returns 
+ * @param stakePool
+ * @param stakePoolWithdrawAuthority
+ * @param validatorList
+ * @param reserveStake
+ * @param validatorStakeAccounts
+ * @param startIndex
+ * @param noMerge
+ * @returns
  * @throws
  */
 export function updateValidatorListBalanceTransaction(
@@ -230,7 +226,7 @@ export function updateValidatorListBalanceTransaction(
     { pubkey: StakeProgram.programId, isSigner: false, isWritable: false },
     { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
   ];
-  
+
   for (const vsa of validatorStakeAccounts) {
     const { main, transient } = vsa;
     keys.push({
