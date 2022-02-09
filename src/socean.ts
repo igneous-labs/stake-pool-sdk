@@ -160,7 +160,7 @@ export class Socean {
   }
 
   /**
-   * Creates a set of transactions and signer keypairs for withdrawing stake from the Socean stake pool
+   * Creates a set of transactions and signer keypairs for withdrawing stake from the Socean stake pool,
    * and the new stake accounts to receive the withdrawn stake
    * Each inner `TransactionWithSigners` array of `transactionSequence` must be executed and confirmed
    * before going to the next one.

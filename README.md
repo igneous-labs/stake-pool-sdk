@@ -55,12 +55,63 @@ const stakePoolAccount = socean.getStakePoolAccount();
 
 
 ### Stake SOL and Receive scnSOL
-```ts
+
+Frontend (react example):
+
+```tsx
+import { Socean, Numberu64 } from '@soceanfi/stake-pool-sdk';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { FC } from 'react';
+
+const socean = new Socean('mainnet-beta');
+
+const StakeOneLamportWithSoceanButton: FC = () => {
+   const wallet = useWallet();
+
+   const onClick = async () => {
+      const signatures = await socean.depositSol(
+         wallet,
+         new Numberu64(1),
+      );
+   }
+
+   return (
+      <button onClick={onClick}>
+         Stake one lamport with Socean
+      </button>
+   );
+}
+
 ```
 
 
-### Unstake scnSOL and Receive SOL
-```ts
+### Unstake scnSOL and Receive staked SOL
+
+Frontend (react example):
+
+```tsx
+import { Socean, Numberu64 } from '@soceanfi/stake-pool-sdk';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { FC } from 'react';
+
+const socean = new Socean('mainnet-beta');
+
+const WithdrawOneDropletFromSoceanButton: FC = () => {
+   const wallet = useWallet();
+
+   const onClick = async () => {
+      const { transactionSignatures, stakeAccounts } = await socean.withdrawStake(
+         wallet,
+         new Numberu64(1),
+      );
+   }
+
+   return (
+      <button onClick={onClick}>
+         Withdraw one droplet (1 / 10 ** 9 scnSOL) from Socean
+      </button>
+   );
+}
 ```
 
 
