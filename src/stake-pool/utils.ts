@@ -26,13 +26,13 @@ import {
   StakePoolAccount,
   STAKE_STATE_LEN,
   ValidatorListAccount,
-  TransactionWithSigners,
   Numberu64,
 } from './types';
 import { withdrawStakeInstruction } from "./instructions";
 import * as schema from "./schema";
 import { addStakePoolSchema, ValidatorStakeInfo, ValidatorList } from "./schema";
-import { RpcError, WithdrawalUnserviceableError } from "./err";
+import { RpcError, WithdrawalUnserviceableError } from "../err";
+import { TransactionWithSigners } from "../transactions";
 addStakePoolSchema(SOLANA_SCHEMA);
 
 export function reverse(object: any) {

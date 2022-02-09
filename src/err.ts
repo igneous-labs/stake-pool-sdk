@@ -37,6 +37,15 @@ export class WithdrawalUnserviceableError extends Error {
   }
 }
 
+/**
+ * Wallet adapter does not have a readable publicKey property
+ */
+export class WalletPublicKeyUnavailableError extends Error {
+  constructor() {
+    super("Wallet adapter public key not available");
+  }
+}
+
 ///**
 // * Error class reprensenting a partially-filled withdraw-stake operation
 // */

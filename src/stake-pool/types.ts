@@ -30,14 +30,6 @@ export interface ValidatorListAccount {
 }
 
 /**
- * Wrapper type containing a transaction and associated signers of the transaction
- */
-export type TransactionWithSigners = {
-  tx: Transaction;
-  signers: Signer[];
-};
-
-/**
  * Numerical enum for the different Stake Pool instructions
  * NOTE: this must match the order in instruction.rs in order
  * for their numerical value to correctly correspond.
@@ -142,4 +134,9 @@ export class Numberu64 extends BN {
       16,
     );
   }
+}
+
+export type ValidatorAllStakeAccounts = {
+  main: PublicKey,
+  transient: PublicKey,
 }
