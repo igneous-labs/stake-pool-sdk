@@ -2,9 +2,16 @@
 
 # Socean Stake Pool Typescript SDK
 
-(TODO: a brief brand intro copy)
+[Socean Stake](https://socean.fi/app/stake) is a liquid staking protocol built
+on Solana that delivers the highest risk-free yields on Solana through Socean’s
+algorithmic delegation strategy. Users can stake their SOL tokens with the
+Socean Stake Pool and receive [scnSOL] tokens in return. These [scnSOL] tokens
+can be used across Solana’s DeFi ecosystem or can be swapped back to SOL anytime.
 
-This SDK provide a client to interact with the staking protocol and allows you to stake and unstake through socean stake pool within your applications.
+[scnSOL]: https://solscan.io/token/5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm
+
+This SDK provide a client to interact with the staking protocol and allows you
+to stake and unstake through socean stake pool within your applications.
 
 (TODO: badges for project license, discord, npm version, size on npm)
 
@@ -16,6 +23,7 @@ Contents:
 - [Installation](#installation)
 - [Examples](#examples)
    - [Initialization](#initialization)
+   - [Retreive on-chain state](#retreive-on-chain-state)
    - [Stake SOL and receive scnSOL](#stake-sol-and-receive-scnsol)
    - [UnStake scnSOL and receive SOL](#unstake-scnsol-and-receive-sol)
 - [Learn more](#learn-more)
