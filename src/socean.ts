@@ -1,6 +1,8 @@
 /**
  * Socean class
  *
+ * Implements the client that interacts with Socean stake pool.
+ *
  * @module
  */
 import { Transaction, PublicKey, Keypair } from "@solana/web3.js";
@@ -158,7 +160,7 @@ export class Socean {
   }
 
   /**
-   * Creates the transactions to withdraw stake from the Socean stake pool
+   * Creates a set of transactions and signer keypairs for withdrawing stake from the Socean stake pool,
    * and the new stake accounts to receive the withdrawn stake
    * Each inner `TransactionWithSigners` array of `transactionSequence` must be executed and confirmed
    * before going to the next one.
@@ -184,8 +186,7 @@ export class Socean {
     const fromAmountDroplets = amountDroplets.toNumber();
     const toAmountLamports = (1 - fee) * (fromAmountDroplets * price);
 
-    // TODO: The original code from the frontend calls the return of the
-    // `validatorsToWithdrawFrom` `amounts` which is very confusing. Call it something else.
+    // calculate the amounts to withdraw from for each validator
     const amounts = await validatorsToWithdrawFrom(
       new PublicKey(this.config.stakePoolProgramId),
       new PublicKey(this.config.stakePoolAccountPubkey),
@@ -225,7 +226,7 @@ export class Socean {
     return signAndSendTransactionSequence(
       walletAdapter,
       transactionSequence,
-      this.config.connection, 
+      this.config.connection,
     );
   }
 
@@ -291,7 +292,7 @@ export class Socean {
   /**
    * Creates the list of transactions to completely update the validator list
    * @param stakePool
-   * @param validatorListAcc 
+   * @param validatorListAcc
    * @param withdrawAuthority
    */
   private async updateValidatorListBalanceTransactions(
@@ -365,7 +366,7 @@ export class Socean {
 
   /**
    * Returns the validator stake account given the validator's vote account
-   * @param voteAccount 
+   * @param voteAccount
    */
   async validatorStakeAccount(voteAccount: PublicKey): Promise<PublicKey> {
     return getValidatorStakeAccount(
@@ -377,7 +378,7 @@ export class Socean {
 
   /**
    * Returns the transient stake account given the validator's vote account
-   * @param voteAccount 
+   * @param voteAccount
    */
    async transientStakeAccount(voteAccount: PublicKey): Promise<PublicKey> {
     return getValidatorStakeAccount(

@@ -17,6 +17,8 @@ const MAINNET_STAKEPOOL_PROGRAM_ID = "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9
 
 export type ClusterType = 'mainnet-beta' | 'testnet';
 
+/**
+ */
 export class SoceanConfig {
     stakePoolAccountPubkey: PublicKey;
     stakePoolProgramId: PublicKey;

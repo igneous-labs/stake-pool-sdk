@@ -1,3 +1,8 @@
+/**
+ * Utility functions
+ *
+ * @module
+ */
 import {
   AccountInfo,
   PublicKey,
@@ -30,7 +35,6 @@ import { RpcError, WithdrawalUnserviceableError } from "../err";
 import { TransactionWithSigners } from "../transactions";
 addStakePoolSchema(SOLANA_SCHEMA);
 
-
 export function reverse(object: any) {
   for (const val in object) {
     if (object[val] instanceof PublicKey) {
@@ -51,14 +55,12 @@ export function reverse(object: any) {
 
 /**
  * Parses stake pool account info into StakePoolAccount
- * @param connection active connection
- * @param owner pubkey of the owner of the associated account
- * @param mint mint address of the token account
- * @param tx transaction to add create instruction to if need be
- * @returns the public key of the associated token account
+ * @param stakePoolAccountPubkey pubkey of the stake pool account
+ * @param account stake pool account info
+ * @returns StakePoolAccount
  */
 export function getStakePoolFromAccountInfo(
-  stakePoolAccountPubkey: PublicKey,
+  pubkey: PublicKey,
   account: AccountInfo<Buffer>,
 ): StakePoolAccount {
   const stakePool = schema.StakePool.decodeUnchecked(account.data);
@@ -66,7 +68,7 @@ export function getStakePoolFromAccountInfo(
   reverse(stakePool);
 
   return {
-    publicKey: stakePoolAccountPubkey,
+    publicKey: pubkey,
     account: {
       data: stakePool,
       executable: account.executable,
@@ -76,6 +78,12 @@ export function getStakePoolFromAccountInfo(
   };
 }
 
+/**
+ * Parses validator list account info into ValidatorListAccount
+ * @param pubkey public key of the stake pool account
+ * @param account stake pool account info
+ * @returns ValidatorListAccount
+ */
 export function getValidatorListFromAccountInfo(
   pubkey: PublicKey,
   account: AccountInfo<Buffer>,
@@ -109,6 +117,8 @@ export const calcPoolPriceAndFee = (stakePool: StakePoolAccount): [number, numbe
 /**
  * Algorithm to select which validators to withdraw from and how much from each
  *
+ * @param stakePoolProgramId program id of the stake pool program
+ * @param stakePoolPubkey public key of the stake pool account
  * @param withdrawalAmountDroplets: amount to withdraw in droplets
  * @param withdrawalAmountLamports: total amount to deduct from all involved validator stake accounts in lamports
  * @param validatorList: ValidatorList account data
@@ -123,7 +133,7 @@ export const calcPoolPriceAndFee = (stakePool: StakePoolAccount): [number, numbe
  * @throws WithdrawalUnserviceableError if a suitable withdraw procedure is not found
  */
 export async function validatorsToWithdrawFrom(
-  stakePoolProgramAddress: PublicKey,
+  stakePoolProgramId: PublicKey,
   stakePoolPubkey: PublicKey,
   withdrawalAmountDroplets: number,
   withdrawalAmountLamports: number,
@@ -131,7 +141,7 @@ export async function validatorsToWithdrawFrom(
   reserve: PublicKey,
 ): Promise<[PublicKey, number][]> {
   // For now just pick the validator with the largest stake
-  // note: this means we cannot service withdrawls larger than that right now
+  // NOTE: this means we cannot service withdrawls larger than that right now
   const validators = validatorList.validators;
   // no active validators, withdraw from reserve
   // also, reduce() throws error if array empty
@@ -150,12 +160,12 @@ export async function validatorsToWithdrawFrom(
   const isTransient = heaviest.activeStakeLamports.eq(new BN(0));
   const stakeAcc = await (isTransient
     ? getValidatorTransientStakeAccount(
-        stakePoolProgramAddress,
+        stakePoolProgramId,
         stakePoolPubkey,
         heaviest.voteAccountAddress,
       )
     : getValidatorStakeAccount(
-        stakePoolProgramAddress,
+        stakePoolProgramId,
         stakePoolPubkey,
         heaviest.voteAccountAddress,
       ));
@@ -194,17 +204,17 @@ export function validatorTotalStake(validator: ValidatorStakeInfo): BN {
 
 /**
  * Gets the address of the stake pool's stake account for the given validator
- * @param stakePoolProgramId: Pubkey of the stake pool program
- * @param stakePool: Pubkey of the stake pool to deposit to
- * @param validatorVoteAccount: Pubkey of the validator to find the stake account of
+ * @param stakePoolProgramId public key of the stake pool program
+ * @param stakePoolPubkey public key of the stake pool to deposit to
+ * @param validatorVoteAccount public key of the validator to find the stake account of
  */
 export async function getValidatorStakeAccount(
   stakePoolProgramId: PublicKey,
-  stakePool: PublicKey,
+  stakePoolPubkey: PublicKey,
   validatorVoteAccount: PublicKey,
 ): Promise<PublicKey> {
   const [key, _bump_seed] = await PublicKey.findProgramAddress(
-    [validatorVoteAccount.toBuffer(), stakePool.toBuffer()],
+    [validatorVoteAccount.toBuffer(), stakePoolPubkey.toBuffer()],
     stakePoolProgramId,
   );
   return key;
@@ -212,20 +222,20 @@ export async function getValidatorStakeAccount(
 
 /**
  * Gets the address of the stake pool's transient stake account for the given validator
- * @param stakePoolProgramId: Pubkey of the stake pool program
- * @param stakePool: Pubkey of the stake pool to deposit to
- * @param validatorVoteAccount: Pubkey of the validator to find the stake account of
+ * @param stakePoolProgramId public key of the stake pool program
+ * @param stakePoolPubkey public key of the stake pool to deposit to
+ * @param validatorVoteAccount public key of the validator to find the stake account of
  */
 export async function getValidatorTransientStakeAccount(
   stakePoolProgramId: PublicKey,
-  stakePool: PublicKey,
+  stakePoolPubkey: PublicKey,
   validatorVoteAccount: PublicKey,
 ): Promise<PublicKey> {
   const [key, _bump_seed] = await PublicKey.findProgramAddress(
     [
       Buffer.from("transient"),
       validatorVoteAccount.toBuffer(),
-      stakePool.toBuffer(),
+      stakePoolPubkey.toBuffer(),
     ],
     stakePoolProgramId,
   );
@@ -250,10 +260,10 @@ export async function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKe
  * Fallible, caller must catch possible errors.
  *
  * @param connection active connection
- * @param walletPubkey wallet to withdraw sol to
- * @param stakePoolProgramId
- * @param stakePool
- * @param validatorList
+ * @param walletPubkey wallet to withdraw SOL to
+ * @param stakePoolProgramId program id of the stake pool program
+ * @param stakePool stake pool account
+ * @param validatorList validator list account
  * @param amounts: list of [Pubkey, number] tuples, where each tuple is
  *                 [0]: Stake pool validator stake account
  *                 [1]: amount of pool tokens to withdraw from that account
@@ -364,6 +374,7 @@ export async function getWithdrawStakeTransactions(
 
 /**
  * Wraps a fallible web3 rpc call, throwing an RpcError if it fails
+ * @param fallibleRpcCall a promise to be wrapped
  * @returns result of the rpc call
  * @throws RpcError
  */
@@ -425,15 +436,15 @@ export async function getOrCreateAssociatedAddress(
 
 /**
  * Gets the withdraw authority PDA of the given stake pool
- * @param stakePoolProgramId: Pubkey of the stake pool program
- * @param stakePool: Pubkey of the stake pool to deposit to
+ * @param stakePoolProgramId public key of the stake pool program
+ * @param stakePoolPubkey public key of the stake pool to deposit to
  */
 export async function getWithdrawAuthority(
   stakePoolProgramId: PublicKey,
-  stakePool: PublicKey,
+  stakePoolPubkey: PublicKey,
 ): Promise<PublicKey> {
   const [key, _bump_seed] = await PublicKey.findProgramAddress(
-    [stakePool.toBuffer(), Buffer.from("withdraw")],
+    [stakePoolPubkey.toBuffer(), Buffer.from("withdraw")],
     stakePoolProgramId,
   );
   return key;
@@ -441,15 +452,15 @@ export async function getWithdrawAuthority(
 
 /**
  * Gets the default deposit authority PDA of the given stake pool
- * @param stakePoolProgramId: Pubkey of the stake pool program
- * @param stakePool: Pubkey of the stake pool to deposit to
+ * @param stakePoolProgramId public key of the stake pool program
+ * @param stakePoolPubkey public key of the stake pool to deposit to
  */
 export async function getDefaultDepositAuthority(
   stakePoolProgramId: PublicKey,
-  stakePool: PublicKey,
+  stakePoolPubkey: PublicKey,
 ): Promise<PublicKey> {
   const [key, _bump_seed] = await PublicKey.findProgramAddress(
-    [stakePool.toBuffer(), Buffer.from("deposit")],
+    [stakePoolPubkey.toBuffer(), Buffer.from("deposit")],
     stakePoolProgramId,
   );
   return key;
