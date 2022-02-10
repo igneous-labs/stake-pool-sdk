@@ -4,7 +4,7 @@
  * @module
  */
 
-import { struct, u8, u32, blob } from "@solana/buffer-layout";
+import { struct, u8, u32 } from "@solana/buffer-layout";
 
 import {
   PublicKey,
