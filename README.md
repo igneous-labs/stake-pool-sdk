@@ -85,7 +85,7 @@ const StakeOneLamportWithSoceanButton: FC = () => {
 ```
 
 
-### Unstake scnSOL and Receive staked SOL
+### Unstake scnSOL and Receive SOL
 
 Frontend (react example):
 
