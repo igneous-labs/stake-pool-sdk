@@ -4,9 +4,7 @@
  * @module
  */
 
-// use require to bypass lack of @types for buffer-layout
-// note: this means theres no type checking for BufferLayout stuff
-import BufferLayout = require("buffer-layout");
+import { struct, u8, u32 } from "@solana/buffer-layout";
 
 import {
   PublicKey,
@@ -20,7 +18,11 @@ import {
 } from "@solana/web3.js";
 
 import * as Layout from "./layout";
-import { Numberu64, StakePoolInstruction, ValidatorAllStakeAccounts } from "./types";
+import {
+  Numberu64,
+  StakePoolInstruction,
+  ValidatorAllStakeAccounts,
+} from "./types";
 
 /**
  * Initializes a DepositSol stake pool instruction given the required accounts and data
@@ -53,10 +55,10 @@ export const depositSolInstruction = (
   amount: number | Numberu64,
   solDepositAuthority?: PublicKey,
 ): TransactionInstruction => {
-  const dataLayout = BufferLayout.struct([
-    BufferLayout.u8("instruction"),
-    Layout.uint64("amount"),
-  ]);
+  const dataLayout = struct<{
+    instruction: number;
+    amount: Uint8Array;
+  }>([u8("instruction"), Layout.uint64("amount")]);
 
   const data = Buffer.alloc(dataLayout.span);
   dataLayout.encode(
@@ -97,7 +99,7 @@ export const depositSolInstruction = (
     programId: stakePoolProgramId,
     data,
   });
-}
+};
 
 /**
  * Initializes a WithdrawStake stake pool instruction given the required accounts and data
@@ -133,10 +135,10 @@ export function withdrawStakeInstruction(
   tokenProgramId: PublicKey,
   amount: number | Numberu64,
 ): TransactionInstruction {
-  const dataLayout = BufferLayout.struct([
-    BufferLayout.u8("instruction"),
-    Layout.uint64("amount"),
-  ]);
+  const dataLayout = struct<{
+    instruction: number;
+    amount: Uint8Array;
+  }>([u8("instruction"), Layout.uint64("amount")]);
 
   const data = Buffer.alloc(dataLayout.span);
   dataLayout.encode(
@@ -200,10 +202,14 @@ export function updateValidatorListBalanceTransaction(
   startIndex: number,
   noMerge: boolean,
 ): Transaction {
-  const dataLayout = BufferLayout.struct([
-    BufferLayout.u8("instruction"),
-    BufferLayout.u32("startIndex"),
-    BufferLayout.u8("noMerge"), // no boolean type in BufferLayout
+  const dataLayout = struct<{
+    instruction: number;
+    startIndex: number;
+    noMerge: number;
+  }>([
+    u8("instruction"),
+    u32("startIndex"),
+    u8("noMerge"), // no boolean type in BufferLayout
   ]);
 
   const data = Buffer.alloc(dataLayout.span);
@@ -260,7 +266,7 @@ export function updateStakePoolBalanceInstruction(
   poolMint: PublicKey,
   tokenProgramId: PublicKey,
 ): TransactionInstruction {
-  const dataLayout = BufferLayout.struct([BufferLayout.u8("instruction")]);
+  const dataLayout = struct<{ instruction: number }>([u8("instruction")]);
 
   const data = Buffer.alloc(dataLayout.span);
   dataLayout.encode(
@@ -293,7 +299,7 @@ export function cleanupRemovedValidatorsInstruction(
   stakePool: PublicKey,
   validatorList: PublicKey,
 ): TransactionInstruction {
-  const dataLayout = BufferLayout.struct([BufferLayout.u8("instruction")]);
+  const dataLayout = struct<{ instruction: number }>([u8("instruction")]);
 
   const data = Buffer.alloc(dataLayout.span);
   dataLayout.encode(
