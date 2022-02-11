@@ -22,7 +22,7 @@
   "scripts": {
     "cli": "ts-node src/cli.ts",
     "lint": "eslint src/ --ext .js,.ts",
-    "test": "ts-mocha tests/*.ts",
+    "test": "ts-mocha --timeout 1000000 tests/*.ts",
     "clean": "rm -rf dist build package",
     "ts-node": "ts-node",
     "docs": "typedoc --entryPoints src/index.ts",
