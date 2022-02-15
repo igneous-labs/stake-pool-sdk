@@ -59,14 +59,17 @@ describe('test basic functionalities', () => {
   it('it deposits and withdraws on testnet', async () => {
     const socean = new Socean();
     const connection = new Connection(clusterApiUrl("testnet"));
-    
-    // prep wallet and airdrop 1 SOL
+
+    // prep wallet and airdrop SOL if necessary
     const stakerKeypair = keypairFromLocalFile("testnet-staker.json");
     const staker: WalletAdapter = new MockWalletAdapter(stakerKeypair);
     const airdropSol = 1;
-    console.log("airdropping", airdropSol, "SOL to", staker.publicKey.toString(), "...");
-    await airdrop(connection, staker.publicKey, airdropSol);
-    const originalBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
+    let originalBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
+    if (originalBalanceLamports < airdropSol * LAMPORTS_PER_SOL) {
+        console.log("airdropping", airdropSol, "SOL to", staker.publicKey.toString(), "...");
+        await airdrop(connection, staker.publicKey, airdropSol);
+        originalBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
+    }
     console.log("staker:", staker.publicKey.toBase58());
     console.log("original balance:", originalBalanceLamports);
 
@@ -79,7 +82,7 @@ describe('test basic functionalities', () => {
     await connection.confirmTransaction(lastDepositTxId, "finalized");
     console.log("deposit tx id: ", lastDepositTxId);
 
-    // assert the balance decreased by 0.5
+    // assert the balance decreased by ~0.5
     const afterDepositBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
     console.log("balance after deposit:", afterDepositBalanceLamports);
     expect(afterDepositBalanceLamports).to.be.below(originalBalanceLamports - depositAmountSol * LAMPORTS_PER_SOL);
