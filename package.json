@@ -4,6 +4,7 @@
   "description": "Socean Stake Pool Typescript SDK",
   "author": "socean finance <socean@socean.fi>",
   "repository": "https://github.com/igneous-labs/stake-pool-sdk",
+  "homepage": "https://socean.fi",
   "license": "MIT",
   "keywords": [
     "socean.fi",
@@ -56,5 +57,8 @@
     "borsh": "^0.7.0",
     "buffer": "^6.0.3",
     "yargs": "^17.3.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
