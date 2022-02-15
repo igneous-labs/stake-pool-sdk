@@ -1,22 +1,23 @@
-import { strict as assert } from 'assert';
 import { expect } from "chai";
-import { clusterApiUrl, Connection, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { clusterApiUrl, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, StakeProgram, SystemProgram, Transaction } from '@solana/web3.js';
 
 import { Numberu64 } from '../src/stake-pool/types';
 import { Socean, WalletAdapter } from '../src';
-import { airdrop, MockWalletAdapter } from './utils';
+import { airdrop, keypairFromLocalFile, MockWalletAdapter } from './utils';
+import { Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { setTimeout } from "timers/promises";
 
 describe('test basic functionalities', () => {
   it('it initializes and gets stake pool account', async () => {
     const socean = new Socean();
     const res = await socean.getStakePoolAccount();
-    console.log(res);
+    expect(res.account.data.poolMint.toString()).to.eq("5oVNVwKYAGeFhvat29XFVH89oXNpLsV8uCPEqSooihsw");
   });
 
   it('it initializes mainnet and gets stake pool account', async () => {
     const socean = new Socean('mainnet-beta');
     const res = await socean.getStakePoolAccount();
-    console.log(res);
+    expect(res.account.data.poolMint.toString()).to.eq("5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm");
   });
 
   it('it generates deposit sol tx', async () => {
@@ -59,30 +60,89 @@ describe('test basic functionalities', () => {
   it('it deposits and withdraws on testnet', async () => {
     const socean = new Socean();
     const connection = new Connection(clusterApiUrl("testnet"));
+    
+    const originalBalanceSol = 1;
 
     // prep wallet and airdrop 1 SOL
-    const staker: WalletAdapter = new MockWalletAdapter(Keypair.generate());
-    await airdrop(connection, staker.publicKey, 1);
+    const stakerKeypair = keypairFromLocalFile("testnet-staker.json");
+    const staker: WalletAdapter = new MockWalletAdapter(stakerKeypair);
+    await airdrop(connection, staker.publicKey, originalBalanceSol);
     const originalBalance = await connection.getBalance(staker.publicKey, "confirmed");
     console.log("staker:", staker.publicKey.toBase58());
     console.log("original balance:", originalBalance);
 
     // deposit 0.5 sol
-    const depositAmount = 0.5 * LAMPORTS_PER_SOL;
+    const depositAmountSol = 0.5;
+    const depositAmount = depositAmountSol * LAMPORTS_PER_SOL;
     console.log("deposit amout:", depositAmount);
-    const lastTxId = (await socean.depositSol(staker, new Numberu64(depositAmount))).pop().pop();
+    const lastDepositTxId = (await socean.depositSol(staker, new Numberu64(depositAmount))).pop().pop();
     // wait until the last tx (deposit) is confirmed
-    await connection.confirmTransaction(lastTxId, "confirmed");
+    await connection.confirmTransaction(lastDepositTxId, "confirmed");
+    console.log("tx id: ", lastDepositTxId);
 
     // assert the balance decreased by 0.5
-    const afterDepositBalance = await connection.getBalance(staker.publicKey, "confirmed");
-    console.log("balance after deposit:", afterDepositBalance);
-    expect(afterDepositBalance).to.be.below(depositAmount * LAMPORTS_PER_SOL);
+    const afterDepositBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
+    console.log("balance after deposit:", afterDepositBalanceLamports);
+    expect(afterDepositBalanceLamports).to.be.below((originalBalanceSol - depositAmountSol) * LAMPORTS_PER_SOL);
 
-    // TODO: assert scnSOL balance != 0
+    // assert scnSOL balance > 0
+    const stakePool = await socean.getStakePoolAccount();
+    const scnSolMint = stakePool.account.data.poolMint;
+    const scnSolToken = new Token(
+      connection,
+      scnSolMint,
+      TOKEN_PROGRAM_ID,
+      stakerKeypair,
+    );
+    let scnSolAcct = await scnSolToken.getOrCreateAssociatedAccountInfo(staker.publicKey);
+    const scnSolAmt = scnSolAcct.amount;
+    expect(scnSolAmt.toNumber()).to.be.above(0);
 
-    // TODO: withdraw
+    // withdraw
+    const { transactionSignatures, stakeAccounts } = await socean.withdrawStake(staker, scnSolAmt);
+    const lastWithdrawTxId = transactionSignatures.pop().pop();
+    // wait until the last tx (withdraw) is confirmed
+    await connection.confirmTransaction(lastWithdrawTxId, "confirmed");
 
-    // TODO: assert SOL balance increased after withdrawal
+    // assert scnSOL account empty
+    scnSolAcct = await scnSolToken.getOrCreateAssociatedAccountInfo(staker.publicKey);
+    expect(scnSolAcct.amount.toNumber()).to.be(0);
+
+    // assert stake accounts present after withdrawal and have stake
+    const stakeAccountPubkeys = stakeAccounts.map((stakeAccount) => stakeAccount.publicKey);
+    const allStakeAccounts = await connection.getMultipleAccountsInfo(stakeAccountPubkeys);
+    allStakeAccounts.map(async (stakeAccount, i) => {
+      const { data } = stakeAccount;
+      if (data instanceof Buffer) {
+        throw new Error("expected stake account, got Buffer");
+      }
+      // @ts-ignore
+      expect(data.delegation.stake.toNumber()).to.be.above(0);
+
+      // cleanup: send account to manager
+      // 0 is stake authority, 1 is withdraw authority
+      const transferAuthTxs = [0, 1].map((authType) => StakeProgram.authorize({
+        authorizedPubkey: staker.publicKey,
+        newAuthorizedPubkey: stakePool.account.data.manager,
+        stakeAuthorizationType: { index: authType },
+        stakePubkey: stakeAccountPubkeys[i],
+      }));
+      const tx = transferAuthTxs[1];
+      tx.add(transferAuthTxs[0].instructions[0]);
+      await connection.sendTransaction(tx, [stakerKeypair]);
+    });
+
+    // cleanup: delete temp accounts to be nice to testnet
+    console.log("cleaning up remaining testnet accounts...");
+    await scnSolToken.closeAccount(scnSolAcct.address, staker.publicKey, stakerKeypair, []);
+    const remainingBalance = await connection.getBalance(staker.publicKey, "confirmed");
+    const burnIx = SystemProgram.transfer({
+      fromPubkey: staker.publicKey,
+      lamports: remainingBalance,
+      toPubkey: new PublicKey("1nc1nerator11111111111111111111111111111111"),
+    });
+    const burnTx = new Transaction();
+    burnTx.add(burnIx);
+    await connection.sendTransaction(burnTx, [stakerKeypair]);
   });
 });
