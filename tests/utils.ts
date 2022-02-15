@@ -1,4 +1,4 @@
-import { LAMPORTS_PER_SOL, Transaction, PublicKey, Keypair } from '@solana/web3.js';
+import { LAMPORTS_PER_SOL, Connection, Transaction, PublicKey, Keypair } from '@solana/web3.js';
 import { WalletAdapter } from '../src';
 
 const airdrop = async (connection, pubkey, amount = 1) => {
@@ -21,9 +21,9 @@ class MockWalletAdapter implements WalletAdapter {
 
   async signAllTransactions(txs: Transaction[]): Promise<Transaction[]> {
     // TODO: sign all transactions sequencially
+    txs.forEach((tx) => tx.sign(this._keypair));
     return txs;
   }
-
 }
 
 export { airdrop, MockWalletAdapter };

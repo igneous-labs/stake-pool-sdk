@@ -63,16 +63,16 @@ describe('test basic functionalities', () => {
     const staker: WalletAdapter = new MockWalletAdapter(Keypair.generate());
 
     // airdrop 2 SOL
-    airdrop(connection, staker.publicKey, 2);
+    await airdrop(connection, staker.publicKey, 1);
     const originalBalance = await connection.getBalance(staker.publicKey, "confirmed");
 
 
     // deposit 1 sol
-    await socean.depositSol(staker, new Numberu64(1 * LAMPORTS_PER_SOL));
+    await socean.depositSol(staker, new Numberu64(0.5 * LAMPORTS_PER_SOL));
 
-    // assert the balance decreased by > 1;
+    // assert the balance decreased by > 0.5;
     const afterDepositBalance = await connection.getBalance(staker.publicKey, "confirmed");
-    assert(originalBalance - afterDepositBalance > 1);
+    assert(originalBalance - afterDepositBalance > 0.5);
 
     // TODO: assert scnSOL balance != 0
 
