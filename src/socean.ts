@@ -17,7 +17,6 @@ import {
   getOrCreateAssociatedAddress,
   getWithdrawAuthority,
   getWithdrawStakeTransactions,
-  getDefaultDepositAuthority,
   validatorsToWithdrawFrom,
   calcPoolPriceAndFee,
   tryRpc,
