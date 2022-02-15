@@ -1,8 +1,9 @@
 import { strict as assert } from 'assert';
-import { clusterApiUrl, Connection, Keypair } from '@solana/web3.js';
-import { Numberu64 } from '../src/stake-pool/types';
+import { clusterApiUrl, Connection, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
-import { Socean } from '../src';
+import { Numberu64 } from '../src/stake-pool/types';
+import { Socean, WalletAdapter } from '../src';
+import { airdrop, MockWalletAdapter } from './utils';
 
 describe('test basic functionalities', () => {
   it('it initializes and gets stake pool account', async () => {
@@ -54,4 +55,27 @@ describe('test basic functionalities', () => {
     }
   });
 
+  it('it deposits and withdraws on testnet', async () => {
+    const socean = new Socean();
+    const connection = new Connection(clusterApiUrl("testnet"));
+
+    // get wallet
+    const staker: WalletAdapter = new MockWalletAdapter(Keypair.generate());
+
+    // airdrop 2 SOL
+    airdrop(connection, staker.publicKey, 2);
+    const originalBalance = await connection.getBalance(staker.publicKey, "confirmed");
+
+
+    // deposit 1 sol
+    await socean.depositSol(staker, new Numberu64(1 * LAMPORTS_PER_SOL));
+
+    // assert the balance decreased by > 1;
+    const afterDepositBalance = await connection.getBalance(staker.publicKey, "confirmed");
+    assert(originalBalance - afterDepositBalance > 1);
+
+    // TODO: assert scnSOL balance != 0
+
+    // TODO: withdraw
+  });
 });
