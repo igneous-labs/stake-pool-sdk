@@ -95,7 +95,6 @@ export class Socean {
 
     // prep deposit sol instruction
     const stakePoolWithdrawAuthority = await getWithdrawAuthority(this.config.stakePoolProgramId, this.config.stakePoolAccountPubkey);
-    const solDepositAuthority = await getDefaultDepositAuthority(this.config.stakePoolProgramId, this.config.stakePoolAccountPubkey);
     const ix = depositSolInstruction(
       this.config.stakePoolProgramId,
       this.config.stakePoolAccountPubkey,
@@ -108,7 +107,6 @@ export class Socean {
       stakePool.account.data.poolMint,
       TOKEN_PROGRAM_ID,
       amountLamports,
-      solDepositAuthority,
     );
     tx.add(ix);
     const transactionSequence: TransactionSequence = [[

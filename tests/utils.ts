@@ -13,14 +13,13 @@ const airdrop = async (connection, pubkey, amount = 1) => {
 };
 
 class MockWalletAdapter implements WalletAdapter {
-  publicKey: null | PublicKey;
+  publicKey: PublicKey;
 
   constructor(private _keypair: Keypair) {
     this.publicKey = _keypair.publicKey;
   }
 
   async signAllTransactions(txs: Transaction[]): Promise<Transaction[]> {
-    // TODO: sign all transactions sequencially
     txs.forEach((tx) => tx.sign(this._keypair));
     return txs;
   }
