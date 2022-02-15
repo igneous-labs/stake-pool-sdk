@@ -5,7 +5,6 @@ import { Numberu64 } from '../src/stake-pool/types';
 import { Socean, WalletAdapter } from '../src';
 import { airdrop, keypairFromLocalFile, MockWalletAdapter } from './utils';
 import { Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { setTimeout } from "timers/promises";
 
 describe('test basic functionalities', () => {
   it('it initializes and gets stake pool account', async () => {
@@ -61,29 +60,29 @@ describe('test basic functionalities', () => {
     const socean = new Socean();
     const connection = new Connection(clusterApiUrl("testnet"));
     
-    const originalBalanceSol = 1;
-
     // prep wallet and airdrop 1 SOL
     const stakerKeypair = keypairFromLocalFile("testnet-staker.json");
     const staker: WalletAdapter = new MockWalletAdapter(stakerKeypair);
-    await airdrop(connection, staker.publicKey, originalBalanceSol);
-    const originalBalance = await connection.getBalance(staker.publicKey, "confirmed");
+    const airdropSol = 1;
+    console.log("airdropping", airdropSol, "SOL to", staker.publicKey.toString(), "...");
+    await airdrop(connection, staker.publicKey, airdropSol);
+    const originalBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
     console.log("staker:", staker.publicKey.toBase58());
-    console.log("original balance:", originalBalance);
+    console.log("original balance:", originalBalanceLamports);
 
     // deposit 0.5 sol
     const depositAmountSol = 0.5;
     const depositAmount = depositAmountSol * LAMPORTS_PER_SOL;
     console.log("deposit amout:", depositAmount);
     const lastDepositTxId = (await socean.depositSol(staker, new Numberu64(depositAmount))).pop().pop();
-    // wait until the last tx (deposit) is confirmed
-    await connection.confirmTransaction(lastDepositTxId, "confirmed");
-    console.log("tx id: ", lastDepositTxId);
+    // wait until the last tx (deposit) is finalized
+    await connection.confirmTransaction(lastDepositTxId, "finalized");
+    console.log("deposit tx id: ", lastDepositTxId);
 
     // assert the balance decreased by 0.5
     const afterDepositBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
     console.log("balance after deposit:", afterDepositBalanceLamports);
-    expect(afterDepositBalanceLamports).to.be.below((originalBalanceSol - depositAmountSol) * LAMPORTS_PER_SOL);
+    expect(afterDepositBalanceLamports).to.be.below(originalBalanceLamports - depositAmountSol * LAMPORTS_PER_SOL);
 
     // assert scnSOL balance > 0
     const stakePool = await socean.getStakePoolAccount();
@@ -98,15 +97,15 @@ describe('test basic functionalities', () => {
     const scnSolAmt = scnSolAcct.amount;
     expect(scnSolAmt.toNumber()).to.be.above(0);
 
-    // withdraw
+    // withdraw all scnSOL
     const { transactionSignatures, stakeAccounts } = await socean.withdrawStake(staker, scnSolAmt);
     const lastWithdrawTxId = transactionSignatures.pop().pop();
-    // wait until the last tx (withdraw) is confirmed
-    await connection.confirmTransaction(lastWithdrawTxId, "confirmed");
+    // wait until the last tx (withdraw) is finalized
+    await connection.confirmTransaction(lastWithdrawTxId, "finalized");
 
     // assert scnSOL account empty
     scnSolAcct = await scnSolToken.getOrCreateAssociatedAccountInfo(staker.publicKey);
-    expect(scnSolAcct.amount.toNumber()).to.be(0);
+    expect(scnSolAcct.amount.toNumber()).to.eq(0);
 
     // assert stake accounts present after withdrawal and have stake
     const stakeAccountPubkeys = stakeAccounts.map((stakeAccount) => stakeAccount.publicKey);
@@ -133,16 +132,7 @@ describe('test basic functionalities', () => {
     });
 
     // cleanup: delete temp accounts to be nice to testnet
-    console.log("cleaning up remaining testnet accounts...");
+    console.log("deleting scnSOL ATA...");
     await scnSolToken.closeAccount(scnSolAcct.address, staker.publicKey, stakerKeypair, []);
-    const remainingBalance = await connection.getBalance(staker.publicKey, "confirmed");
-    const burnIx = SystemProgram.transfer({
-      fromPubkey: staker.publicKey,
-      lamports: remainingBalance,
-      toPubkey: new PublicKey("1nc1nerator11111111111111111111111111111111"),
-    });
-    const burnTx = new Transaction();
-    burnTx.add(burnIx);
-    await connection.sendTransaction(burnTx, [stakerKeypair]);
   });
 });

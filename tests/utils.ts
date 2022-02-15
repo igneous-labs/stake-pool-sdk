@@ -10,7 +10,7 @@ export const airdrop = async (connection: Connection, pubkey: PublicKey, amount:
       pubkey,
       amount * LAMPORTS_PER_SOL
     ),
-    "confirmed"
+    "finalized"
   );
 };
 
@@ -34,7 +34,8 @@ export class MockWalletAdapter implements WalletAdapter {
   }
 
   async signAllTransactions(txs: Transaction[]): Promise<Transaction[]> {
-    txs.forEach((tx) => tx.sign(this._keypair));
+    // Note: must use partialSign(). sign() overwrites all signatures
+    txs.forEach((tx) => tx.partialSign(this._keypair));
     return txs;
   }
 }
