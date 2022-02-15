@@ -62,6 +62,7 @@ export async function signAndSendTransactionSequence(
   const res: TransactionSequenceSignatures = [];
   const feePayer = walletAdapter.publicKey;
   if (!feePayer) throw new WalletPublicKeyUnavailableError();
+
   for (const transactions of transactionSequence) {
     const signatures = await signSendConfirmTransactions(
       walletAdapter,
@@ -78,9 +79,9 @@ export async function signAndSendTransactionSequence(
  * Helper for `signAndSendTransactionSequence`:
  * signs, sends and confirm an inner array of `TransactionWithSigners`
  * @param walletAdapter wallet signing the transaction
- * @param transactions `TransactionWithSigners` to send and confirm 
+ * @param transactions `TransactionWithSigners` to send and confirm
  * @param connection solana connection
- * @param feePayer public key paying for tx fees 
+ * @param feePayer public key paying for tx fees
  * @returns array of all signatures for the transactions
  * @throws RpcError
  */
@@ -91,7 +92,7 @@ async function signSendConfirmTransactions(
   feePayer: PublicKey,
 ): Promise<string[]> {
   const { blockhash } = await tryRpc(connection.getRecentBlockhash("recent"));
-  
+
   const partialSignedTransactions = transactions.map((transaction) => {
     transaction.tx.feePayer = feePayer;
     transaction.tx.recentBlockhash = blockhash;

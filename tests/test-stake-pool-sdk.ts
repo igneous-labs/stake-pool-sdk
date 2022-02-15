@@ -1,4 +1,5 @@
 import { strict as assert } from 'assert';
+import { expect } from "chai";
 import { clusterApiUrl, Connection, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 import { Numberu64 } from '../src/stake-pool/types';
@@ -48,10 +49,10 @@ describe('test basic functionalities', () => {
       // 2. updateStakePool
       // 3. cleanupRemovedValidators
       // 4. deposit
-      assert.equal(4, txs.length);
+      expect(txs.length).to.eq(4);
     } else {
       console.log("Updated this epoch, transactions should not have updates");
-      assert.equal(1, txs.length);
+      expect(txs.length).to.eq(1);
     }
   });
 
@@ -59,23 +60,29 @@ describe('test basic functionalities', () => {
     const socean = new Socean();
     const connection = new Connection(clusterApiUrl("testnet"));
 
-    // get wallet
+    // prep wallet and airdrop 1 SOL
     const staker: WalletAdapter = new MockWalletAdapter(Keypair.generate());
-
-    // airdrop 2 SOL
     await airdrop(connection, staker.publicKey, 1);
     const originalBalance = await connection.getBalance(staker.publicKey, "confirmed");
+    console.log("staker:", staker.publicKey.toBase58());
+    console.log("original balance:", originalBalance);
 
+    // deposit 0.5 sol
+    const depositAmount = 0.5 * LAMPORTS_PER_SOL;
+    console.log("deposit amout:", depositAmount);
+    const lastTxId = (await socean.depositSol(staker, new Numberu64(depositAmount))).pop().pop();
+    // wait until the last tx (deposit) is confirmed
+    await connection.confirmTransaction(lastTxId, "confirmed");
 
-    // deposit 1 sol
-    await socean.depositSol(staker, new Numberu64(0.5 * LAMPORTS_PER_SOL));
-
-    // assert the balance decreased by > 0.5;
+    // assert the balance decreased by 0.5
     const afterDepositBalance = await connection.getBalance(staker.publicKey, "confirmed");
-    assert(originalBalance - afterDepositBalance > 0.5);
+    console.log("balance after deposit:", afterDepositBalance);
+    expect(afterDepositBalance).to.be.below(depositAmount * LAMPORTS_PER_SOL);
 
     // TODO: assert scnSOL balance != 0
 
     // TODO: withdraw
+
+    // TODO: assert SOL balance increased after withdrawal
   });
 });
