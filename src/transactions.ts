@@ -5,7 +5,7 @@ import { tryRpc } from "./stake-pool/utils";
 export interface TransactionWithSigners {
   tx: Transaction;
   signers: Signer[];
-};
+}
 
 /**
  * Partially sign a transaction with its list of signers
