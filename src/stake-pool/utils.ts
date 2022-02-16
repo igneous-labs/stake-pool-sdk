@@ -307,7 +307,7 @@ export async function getWithdrawStakeTransactions(
     chunkOffset += MAX_WITHDRAWALS_PER_TX
   ) {
     const tx = new Transaction();
-    const partialSigners: Signer[] = [];
+    const signers: Signer[] = [];
 
     // Add WithdrawStake Instruction for each validator in the chunk
     for (
@@ -316,20 +316,6 @@ export async function getWithdrawStakeTransactions(
       i++
     ) {
       const [stakeSplitFrom, amount] = amounts[i];
-      // create Approve instruction
-      // ephemeral key pair just to do the transfer
-      const userTokenTransferAuthority = Keypair.generate();
-      partialSigners.push(userTokenTransferAuthority);
-      tx.add(
-        Token.createApproveInstruction(
-          TOKEN_PROGRAM_ID,
-          userPoolTokenAccount,
-          userTokenTransferAuthority.publicKey,
-          walletPubkey,
-          [],
-          amount,
-        ),
-      );
       // create blank stake account
       const stakeSplitTo = Keypair.generate();
       newStakeAccounts.push(stakeSplitTo);
@@ -343,7 +329,7 @@ export async function getWithdrawStakeTransactions(
         }),
       );
       // The tx also needs to be signed by the new stake account's private key
-      partialSigners.push(stakeSplitTo);
+      signers.push(stakeSplitTo);
 
       tx.add(
         withdrawStakeInstruction(
@@ -354,7 +340,7 @@ export async function getWithdrawStakeTransactions(
           stakeSplitFrom,
           stakeSplitTo.publicKey,
           walletPubkey,
-          userTokenTransferAuthority.publicKey,
+          walletPubkey,
           userPoolTokenAccount,
           stakePoolData.managerFeeAccount,
           stakePoolData.poolMint,
@@ -363,9 +349,10 @@ export async function getWithdrawStakeTransactions(
         ),
       );
     }
+
     transactions.push({
       tx,
-      signers: partialSigners,
+      signers,
     });
   }
 
