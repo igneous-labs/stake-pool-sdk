@@ -21,7 +21,8 @@
     "cli": "./dist/esbuild/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "scripts": {
     "cli": "ts-node src/cli.ts",
