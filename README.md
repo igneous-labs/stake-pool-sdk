@@ -1,4 +1,4 @@
-# <p align="center"><a href="https://socean.fi/"><img src="https://raw.githubusercontent.com/lieuzhenghong/socean/master/src/frontend/socean-frontend/public/logos/horizontalLogo_black.png?token=GHSAT0AAAAAABNUAKFF3WQBV5FKGFXWMAZKYQLI6FQ" height="100" alt="Socean"></a>
+# <p align="center"><a href="https://socean.fi/"><img src="./logo.png" height="100" alt="Socean"></a>
 
 # Socean Stake Pool Typescript SDK
 
