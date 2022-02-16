@@ -5,6 +5,7 @@
 <div align="center">
 
 ![Build](https://github.com/igneous-labs/stake-pool-sdk/actions/workflows/main.yml/badge.svg)
+![GitHub](https://img.shields.io/github/license/igneous-labs/stake-pool-sdk)
 [![Discord](https://img.shields.io/discord/852171430089981982?label=discord&style=plastic&color=f24f83)](https://discord.com/invite/socean)
 [![Twitter](https://img.shields.io/twitter/follow/soceanfinance?style=plastic&color=f24f83)](https://twitter.com/SoceanFinance)
 
