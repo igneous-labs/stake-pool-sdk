@@ -2,9 +2,9 @@
 
 <div align="center">
 
-![npm-version](https://img.shields.io/npm/v/@soceanfi/stake-pool-sdk?style=plastic)
-![npm-license](https://img.shields.io/npm/l/@soceanfi/stake-pool-sdk?style=plastic)
-![Build](https://github.com/igneous-labs/stake-pool-sdk/actions/workflows/main.yml/badge.svg)
+[![npm-version](https://img.shields.io/npm/v/@soceanfi/stake-pool-sdk?style=plastic)](https://npmjs.com/@soceanfi/stake-pool-sdk)
+[![npm-license](https://img.shields.io/npm/l/@soceanfi/stake-pool-sdk?style=plastic)](https://npmjs.com/@soceanfi/stake-pool-sdk)
+[![Build](https://github.com/igneous-labs/stake-pool-sdk/actions/workflows/main.yml/badge.svg)](https://github.com/igneous-labs/stake-pool-sdk)
 [![Discord](https://img.shields.io/discord/852171430089981982?label=discord&style=plastic&color=f24f83)](https://discord.com/invite/socean)
 [![Twitter](https://img.shields.io/twitter/follow/soceanfinance?style=plastic&color=f24f83)](https://twitter.com/SoceanFinance)
 
