@@ -5,7 +5,7 @@
 [Socean Stake](https://socean.fi/app/stake) is a liquid staking protocol built
 on Solana that delivers the highest risk-free yields on Solana through Socean’s
 algorithmic delegation strategy. Users can stake their SOL tokens with the
-Socean Stake Pool and receive [scnSOL] tokens in return. These [scnSOL] tokens
+[Socean Stake Pool](https://socean.fi/app/stake) and receive [scnSOL] tokens in return. These [scnSOL] tokens
 can be used across Solana’s DeFi ecosystem or can be swapped back to SOL anytime.
 
 [scnSOL]: https://solscan.io/token/5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm
