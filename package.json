@@ -1,9 +1,10 @@
 {
   "name": "@soceanfi/stake-pool-sdk",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Socean Stake Pool Typescript SDK",
   "author": "socean finance <socean@socean.fi>",
   "repository": "https://github.com/igneous-labs/stake-pool-sdk",
+  "homepage": "https://socean.fi",
   "license": "MIT",
   "keywords": [
     "socean.fi",
@@ -25,7 +26,7 @@
     "test": "ts-mocha --timeout 1000000 tests/test-*.ts",
     "clean": "rm -rf dist build package",
     "ts-node": "ts-node",
-    "docs": "typedoc --entryPoints src/index.ts",
+    "docs": "typedoc --media assets --entryPoints src/index.ts",
     "build": "tsc -p tsconfig.json",
     "build-all": "yarn clean && yarn build && yarn esbuild-node && yarn esbuild-browser",
     "esbuild-browser": "esbuild src/browser.ts --bundle --minify --sourcemap=external --outfile=dist/esbuild/browser.js",
@@ -57,5 +58,8 @@
     "borsh": "^0.7.0",
     "buffer": "^6.0.3",
     "yargs": "^17.3.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

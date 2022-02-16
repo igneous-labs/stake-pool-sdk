@@ -1,4 +1,16 @@
-# <p align="center"><a href="https://socean.fi/"><img src="https://raw.githubusercontent.com/lieuzhenghong/socean/master/src/frontend/socean-frontend/public/logos/horizontalLogo_black.png?token=GHSAT0AAAAAABNUAKFF3WQBV5FKGFXWMAZKYQLI6FQ" height="100" alt="Socean"></a>
+# <div align="center"><a href="https://socean.fi/"><img src="media://logo.png" height="100" alt="Socean"></a></div>
+
+<!--TODO: badges for project license, npm version, size on npm-->
+
+<div align="center">
+
+![Build](https://github.com/igneous-labs/stake-pool-sdk/actions/workflows/main.yml/badge.svg)
+![GitHub](https://img.shields.io/github/license/igneous-labs/stake-pool-sdk)
+[![Discord](https://img.shields.io/discord/852171430089981982?label=discord&style=plastic&color=f24f83)](https://discord.com/invite/socean)
+[![Twitter](https://img.shields.io/twitter/follow/soceanfinance?style=plastic&color=f24f83)](https://twitter.com/SoceanFinance)
+
+</div>
+
 
 # Socean Stake Pool Typescript SDK
 
@@ -12,12 +24,6 @@ can be used across Solana’s DeFi ecosystem or can be swapped back to SOL anyti
 
 This SDK provide a client to interact with the staking protocol and allows you
 to stake and unstake through socean stake pool within your applications.
-
-(TODO: badges for project license, discord, npm version, size on npm)
-
-![Build]( https://github.com/igneous-labs/stake-pool-sdk/actions/workflows/main.yml/badge.svg)
-[![Discord](https://img.shields.io/discord/852171430089981982?label=discord&style=plastic)](https://discord.com/invite/socean)
-[![Twitter](https://img.shields.io/twitter/follow/soceanfinance?style=social)](https://twitter.com/SoceanFinance)
 
 Contents:
 - [Installation](#installation)
@@ -56,7 +62,7 @@ const socean = new Socean(); // or give 'testnet' as the argument
 ```
 
 
-### Retreive on-chain state
+### Retrieve on-chain state
 ```ts
 const stakePoolAccount = socean.getStakePoolAccount();
 ```
@@ -93,7 +99,7 @@ const StakeOneLamportWithSoceanButton: FC = () => {
 ```
 
 
-### Unstake scnSOL and Receive SOL
+### Unstake scnSOL and Receive Stake Accounts
 
 Frontend (react example):
 
