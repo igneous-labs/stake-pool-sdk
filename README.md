@@ -1,4 +1,4 @@
-# <div align="center"><a href="https://socean.fi/"><img src="media://logo.png" height="100" alt="Socean"></a></div>
+# <div align="center"><a href="https://socean.fi/"><img src="https://raw.githubusercontent.com/igneous-labs/stake-pool-sdk/publish/typedoc-url-npm/assets/logo.png" height="100" alt="Socean"></a></div>
 
 <div align="center">
 
