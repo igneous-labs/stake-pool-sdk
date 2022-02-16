@@ -61,7 +61,7 @@ const socean = new Socean(); // or give 'testnet' as the argument
 ```
 
 
-### Retreive on-chain state
+### Retrieve on-chain state
 ```ts
 const stakePoolAccount = socean.getStakePoolAccount();
 ```
@@ -98,7 +98,7 @@ const StakeOneLamportWithSoceanButton: FC = () => {
 ```
 
 
-### Unstake scnSOL and Receive SOL
+### Unstake scnSOL and Receive Stake Accounts
 
 Frontend (react example):
 
