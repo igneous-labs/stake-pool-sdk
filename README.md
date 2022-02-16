@@ -2,11 +2,11 @@
 
 <div align="center">
 
-[![GitHub branch checks state](https://img.shields.io/github/checks-status/igneous-labs/stake-pool-sdk/master?style=plastic)](https://github.com/igneous-labs/stake-pool-sdk)
-[![npm-version](https://img.shields.io/npm/v/@soceanfi/stake-pool-sdk?style=plastic)](https://npmjs.com/@soceanfi/stake-pool-sdk)
-[![npm-license](https://img.shields.io/npm/l/@soceanfi/stake-pool-sdk?style=plastic)](https://npmjs.com/@soceanfi/stake-pool-sdk)
-[![Discord](https://img.shields.io/discord/852171430089981982?label=discord&style=plastic&color=f24f83)](https://discord.com/invite/socean)
-[![Twitter](https://img.shields.io/twitter/follow/soceanfinance?style=plastic&color=f24f83)](https://twitter.com/SoceanFinance)
+[![GitHub branch checks state](https://img.shields.io/github/checks-status/igneous-labs/stake-pool-sdk/master?style=flat)](https://github.com/igneous-labs/stake-pool-sdk)
+[![npm-version](https://img.shields.io/npm/v/@soceanfi/stake-pool-sdk?style=flat)](https://npmjs.com/@soceanfi/stake-pool-sdk)
+[![npm-license](https://img.shields.io/npm/l/@soceanfi/stake-pool-sdk?style=flat)](https://npmjs.com/@soceanfi/stake-pool-sdk)
+[![Discord](https://img.shields.io/discord/852171430089981982?label=discord&style=flat&color=f24f83)](https://discord.com/invite/socean)
+[![Twitter](https://img.shields.io/twitter/follow/soceanfinance?style=flat&color=f24f83)](https://twitter.com/SoceanFinance)
 
 </div>
 
