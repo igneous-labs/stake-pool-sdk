@@ -1,4 +1,4 @@
-# <div align="center"><a href="https://socean.fi/"><img src="./logo.png" height="100" alt="Socean"></a></div>
+# <div align="center"><a href="https://socean.fi/"><img src="media://logo.png" height="100" alt="Socean"></a></div>
 
 <!--TODO: badges for project license, npm version, size on npm-->
 
