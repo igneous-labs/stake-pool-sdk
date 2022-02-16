@@ -29,7 +29,7 @@
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "sourceMap": true,
-    "outDir": "./dist/ts",
+    "outDir": "./dist/tsc",
     "rootDir": "./src",
     "types": [
       "node"
