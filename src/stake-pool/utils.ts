@@ -140,36 +140,48 @@ export async function validatorsToWithdrawFrom(
   validatorList: ValidatorList,
   reserve: PublicKey,
 ): Promise<[PublicKey, number][]> {
-  // For now just pick the validator with the largest stake
-  // NOTE: this means we cannot service withdrawls larger than that right now
   const validators = validatorList.validators;
   // no active validators, withdraw from reserve
   // also, reduce() throws error if array empty
   if (validators.length < 1) return [[reserve, withdrawalAmountDroplets]];
 
   const sortedValidators = sortedValidatorStakeInfos(validators);
-  const heaviest = sortedValidators[0];
+  const dropletsPerLamport = withdrawalAmountDroplets / withdrawalAmountLamports;
+  const res: [PublicKey, number][] = [];
+  
+  let lamportsRemaining = withdrawalAmountLamports;
+  let dropletsRemaining = withdrawalAmountDroplets;
 
-  const available = stakeAvailableToWithdraw(heaviest);
-  if (available.eq(new BN(0))) {
-    return [[reserve, withdrawalAmountDroplets]];
+  // Withdraw from the lightest validators first
+  let i = sortedValidators.length - 1;
+  while (i >= 0) {
+    if (lamportsRemaining === 0) {
+      break;
+    }
+    const validator = sortedValidators[i];
+    const { lamports, stakeAccount } = await stakeAvailableToWithdraw(validator, stakePoolProgramId, stakePoolPubkey);
+    if (lamports.isZero()) {
+      continue;
+    }
+    const lamportsServiced = Math.min(lamportsRemaining, lamports.toNumber());
+    const dropletsServiced = Math.round(dropletsPerLamport * lamportsServiced);
+    if (lamportsServiced === lamportsRemaining && dropletsServiced !== dropletsRemaining) {
+      // rounding error happened somewhere
+      throw new WithdrawalUnserviceableError();
+    }
+
+    res.push([stakeAccount, dropletsServiced]);
+    i -= 1;
+    lamportsRemaining -= lamportsServiced;
+    dropletsRemaining -= dropletsServiced;
   }
-  if (available.lt(new BN(withdrawalAmountLamports))) {
+
+  if (lamportsRemaining > 0) {
+    // might happen if many transient stake accounts
     throw new WithdrawalUnserviceableError();
   }
-  const isTransient = heaviest.activeStakeLamports.eq(new BN(0));
-  const stakeAcc = await (isTransient
-    ? getValidatorTransientStakeAccount(
-        stakePoolProgramId,
-        stakePoolPubkey,
-        heaviest.voteAccountAddress,
-      )
-    : getValidatorStakeAccount(
-        stakePoolProgramId,
-        stakePoolPubkey,
-        heaviest.voteAccountAddress,
-      ));
-  return [[stakeAcc, withdrawalAmountDroplets]];
+  
+  return res;
 }
 
 export function sortedValidatorStakeInfos(
@@ -190,10 +202,45 @@ export function sortedValidatorStakeInfos(
   return [...validatorStakeInfos].sort(compareValidatorStake);
 }
 
-export function stakeAvailableToWithdraw(validator: ValidatorStakeInfo): BN {
-  return validator.activeStakeLamports.gt(new BN(0))
-    ? validator.activeStakeLamports
-    : validator.transientStakeLamports;
+
+// Need this minimum activeStakeLamports for staker to be able to remove validator
+const MIN_ACTIVE_STAKE_LAMPORTS = new BN(1_000_000_00); // 0.1 SOL
+
+/**
+ * Gets the stake available to withdraw from a validator, minus the minimum required to remove the validator
+ * and the pubkey of their stake account to withdraw from (either the active or transient stake account)
+ * @param validator `ValidatorStakeInfo` for the validator
+ * @param stakePoolProgramId
+ * @param stakePoolPubkey
+ * @returns 
+ * - lamports available for withdrawal
+ * - pubkey of the stake account to withdraw from
+ */
+async function stakeAvailableToWithdraw(
+  validator: ValidatorStakeInfo,
+  stakePoolProgramId: PublicKey,
+  stakePoolPubkey: PublicKey
+): Promise<{
+  lamports: BN,
+  stakeAccount: PublicKey,
+}> {
+  // must withdraw from active stake account if active stake account has non-zero balance
+  const isActive = validator.activeStakeLamports.gt(new BN(0));
+  const totalLamports = isActive ? validator.activeStakeLamports : validator.transientStakeLamports;
+  const lamports = totalLamports.lte(MIN_ACTIVE_STAKE_LAMPORTS) ? new BN(0) : totalLamports;
+  const stakeAccount = await (isActive
+    ? getValidatorStakeAccount(
+        stakePoolProgramId,
+        stakePoolPubkey,
+        validator.voteAccountAddress,
+      )
+    : getValidatorTransientStakeAccount(
+      stakePoolProgramId,
+      stakePoolPubkey,
+      validator.voteAccountAddress,
+    )
+  );
+  return { lamports, stakeAccount };
 }
 
 export function validatorTotalStake(validator: ValidatorStakeInfo): BN {
