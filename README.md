@@ -58,6 +58,9 @@ const socean = new Socean('mainnet-beta');
 
 // or for testnet
 const socean = new Socean(); // or give 'testnet' as the argument
+
+// you can also use a custom rpc endpoint
+const socean = new Socean('mainnet-beta', "https://myawesomerpc.com:8899");
 ```
 
 

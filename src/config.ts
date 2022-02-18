@@ -24,7 +24,7 @@ export class SoceanConfig {
     stakePoolProgramId: PublicKey;
     connection: Connection;
 
-    constructor(clusterType: ClusterType) {
+    constructor(clusterType: ClusterType, rpcEndpoint?: string) {
         if (clusterType == 'testnet') {
             this.stakePoolAccountPubkey = new PublicKey(TESTNET_STAKEPOOL_ACCOUNT);
             this.stakePoolProgramId = new PublicKey(TESTNET_STAKEPOOL_PROGRAM_ID);
@@ -32,6 +32,6 @@ export class SoceanConfig {
             this.stakePoolAccountPubkey = new PublicKey(MAINNET_STAKEPOOL_ACCOUNT);
             this.stakePoolProgramId = new PublicKey(MAINNET_STAKEPOOL_PROGRAM_ID);
         }
-        this.connection = new Connection(clusterApiUrl(clusterType));
+        this.connection = new Connection(rpcEndpoint ?? clusterApiUrl(clusterType));
     }
 }
