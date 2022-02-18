@@ -1,4 +1,4 @@
-import { Connection, PublicKey, sendAndConfirmRawTransaction, Signer, Transaction } from "@solana/web3.js";
+import { ConfirmOptions, Connection, PublicKey, sendAndConfirmRawTransaction, Signer, Transaction } from "@solana/web3.js";
 import { WalletPublicKeyUnavailableError } from "./err";
 import { tryRpc } from "./stake-pool/utils";
 
@@ -44,12 +44,24 @@ export type TransactionSequence = Array<TransactionWithSigners[]>;
 export type TransactionSequenceSignatures = Array<string[]>;
 
 /**
+ * Default confirm options for the transactions in a transaction sequence
+ * preflightCommitment: "processed" to avoid blockhash not found error when simulating
+ * commitment: "confirmed". TODO: check if sequence may fail if previous
+ *             transaction array is not yet finalized by the time the next one is sent
+ */
+export const TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS: ConfirmOptions = {
+  preflightCommitment: "processed",
+  commitment: "confirmed",
+}
+
+/**
  * Signs and sends `TransactionSequence`,
  * awaiting confirmations for each inner array of transactions
  * before proceeding to the next one
  * @param walletAdapter wallet signing the transaction
  * @param transactionSequence `TransactionSequence` to sign and send
  * @param connection solana connection
+ * @param confirmOptions transaction confirm options for each transaction
  * @returns `TransactionSequenceSignatures` for all transactions in the `TransactionSequence`
  * @throws RpcError
  * @throws WalletPublicKeyUnavailableError
@@ -58,17 +70,19 @@ export async function signAndSendTransactionSequence(
   walletAdapter: WalletAdapter,
   transactionSequence: TransactionSequence,
   connection: Connection,
+  confirmOptions: ConfirmOptions = TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS,
 ): Promise<TransactionSequenceSignatures> {
   const res: TransactionSequenceSignatures = [];
   const feePayer = walletAdapter.publicKey;
   if (!feePayer) throw new WalletPublicKeyUnavailableError();
 
-  for (const transactions of transactionSequence) {
+  for (const transactionArray of transactionSequence) {
     const signatures = await signSendConfirmTransactions(
       walletAdapter,
-      transactions,
+      transactionArray,
       connection,
-      feePayer
+      feePayer,
+      confirmOptions,
     );
     res.push(signatures);
   }
@@ -79,21 +93,23 @@ export async function signAndSendTransactionSequence(
  * Helper for `signAndSendTransactionSequence`:
  * signs, sends and confirm an inner array of `TransactionWithSigners`
  * @param walletAdapter wallet signing the transaction
- * @param transactions `TransactionWithSigners` to send and confirm
+ * @param transactionArray array of `TransactionWithSigners` to send and confirm
  * @param connection solana connection
  * @param feePayer public key paying for tx fees
+ * @param confirmOptions transaction confirm options for each transaction
  * @returns array of all signatures for the transactions
  * @throws RpcError
  */
 async function signSendConfirmTransactions(
   walletAdapter: WalletAdapter,
-  transactions: TransactionWithSigners[],
+  transactionArray: TransactionWithSigners[],
   connection: Connection,
   feePayer: PublicKey,
+  confirmOptions: ConfirmOptions,
 ): Promise<string[]> {
-  const { blockhash } = await tryRpc(connection.getRecentBlockhash("recent"));
+  const { blockhash } = await tryRpc(connection.getLatestBlockhash("recent"));
 
-  const partialSignedTransactions = transactions.map((transaction) => {
+  const partialSignedTransactions = transactionArray.map((transaction) => {
     transaction.tx.feePayer = feePayer;
     transaction.tx.recentBlockhash = blockhash;
     // Once you sign/partial sign a transaction, you cannot modify it
@@ -103,10 +119,7 @@ async function signSendConfirmTransactions(
   const signedTransactions = await walletAdapter.signAllTransactions(partialSignedTransactions);
 
   const sigPromises = signedTransactions.map((tx) => tryRpc(
-      sendAndConfirmRawTransaction(connection, tx.serialize(), {
-        preflightCommitment: "recent",
-        commitment: "recent",
-      })
+      sendAndConfirmRawTransaction(connection, tx.serialize(), confirmOptions)
     )
   );
 
