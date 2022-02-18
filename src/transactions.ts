@@ -44,9 +44,10 @@ export type TransactionSequence = Array<TransactionWithSigners[]>;
 export type TransactionSequenceSignatures = Array<string[]>;
 
 /**
- * Default confirm options for the transactions in a transaction sequence
- * preflightCommitment: "processed" to avoid blockhash not found error when simulating
- * commitment: "confirmed". TODO: check if sequence may fail if previous
+ * Default confirm options for the transactions in a transaction sequence:
+ * - preflightCommitment: `processed` to avoid blockhash not found error when simulating
+ * - commitment: `confirmed`. web3.js tends to timeout when `finalized` is used instead.
+ *             TODO: check if sequence may fail if previous
  *             transaction array is not yet finalized by the time the next one is sent
  */
 export const TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS: ConfirmOptions = {
