@@ -46,10 +46,9 @@ describe('test basic functionalities', () => {
     if (lastUpdateEpoch.toNumber() < epoch) {
       console.log("Not updated this epoch, transactions should contain updates");
       // 1. updateValidatorListBalance
-      // 2. updateStakePool
-      // 3. cleanupRemovedValidators
-      // 4. deposit
-      expect(txs.length).to.eq(4);
+      // 2. updateStakePool & cleanupRemovedValidators
+      // 3. deposit
+      expect(txs.length).to.eq(3);
     } else {
       console.log("Updated this epoch, transactions should not have updates");
       expect(txs.length).to.eq(1);
@@ -76,7 +75,7 @@ describe('test basic functionalities', () => {
     // deposit 0.5 sol
     const depositAmountSol = 0.5;
     const depositAmount = depositAmountSol * LAMPORTS_PER_SOL;
-    console.log("deposit amout:", depositAmount);
+    console.log("deposit amount:", depositAmount);
     const lastDepositTxId = (await socean.depositSol(staker, new Numberu64(depositAmount))).pop().pop();
     // wait until the last tx (deposit) is finalized
     await connection.confirmTransaction(lastDepositTxId, "finalized");
