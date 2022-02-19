@@ -40,7 +40,7 @@ export class Socean {
    * into the Socean stake pool
    * @param walletAdapter SOL wallet to deposit SOL from
    * @param amountLamports amount to deposit in lamports
-   * @param referrerPoolTokenAccount PublicKey of the referrer for this deposit
+   * @param referrerPoolTokenAccount PublicKey of an scnSOL token account of the referrer for this deposit
    * @param confirmOptions transaction confirm options for each transaction
    * @returns the transaction signatures of the transactions sent and confirmed
    * @throws RpcError
@@ -74,7 +74,7 @@ export class Socean {
    * This is a lower-level API for compatibility, recommend using `depositSol()` instead if possible.
    * @param walletPubkey SOL wallet to deposit SOL from
    * @param amountLamports amount to deposit in lamports
-   * @param referrerPoolTokenAccount PublicKey of the referrer for this deposit
+   * @param referrerPoolTokenAccount PublicKey of an scnSOL token account of the referrer for this deposit
    * @returns the deposit transaction sequence
    * @throws RpcError
    * @throws AccountDoesNotExistError if stake pool does not exist
