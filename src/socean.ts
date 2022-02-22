@@ -31,8 +31,8 @@ import { signAndSendTransactionSequence } from ".";
 export class Socean {
   private readonly config: SoceanConfig;
 
-  constructor(clusterType: ClusterType = 'testnet') {
-    this.config = new SoceanConfig(clusterType);
+  constructor(clusterType: ClusterType = 'testnet', rpcEndpoint?: string) {
+    this.config = new SoceanConfig(clusterType, rpcEndpoint);
   }
 
   /**
