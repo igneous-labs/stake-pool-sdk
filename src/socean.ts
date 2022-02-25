@@ -28,7 +28,7 @@ import { AccountDoesNotExistError, WalletPublicKeyUnavailableError } from "./err
 import { cleanupRemovedValidatorsInstruction, depositSolInstruction, updateStakePoolBalanceInstruction, updateValidatorListBalanceTransaction } from "./stake-pool/instructions";
 import { WalletAdapter, TransactionSequence, TransactionSequenceSignatures, TransactionWithSigners, TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS } from "./transactions";
 import { signAndSendTransactionSequence } from ".";
-import { Fee, StakePool } from "./stake-pool/schema";
+import { StakePool } from "./stake-pool/schema";
 
 export class Socean {
   private readonly config: SoceanConfig;
