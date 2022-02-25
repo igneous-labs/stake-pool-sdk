@@ -22,11 +22,13 @@ import {
   tryRpc,
   getValidatorStakeAccount,
   getValidatorTransientStakeAccount,
+  calcDropletsReceivedForDeposit,
 } from "./stake-pool/utils";
 import { AccountDoesNotExistError, WalletPublicKeyUnavailableError } from "./err";
 import { cleanupRemovedValidatorsInstruction, depositSolInstruction, updateStakePoolBalanceInstruction, updateValidatorListBalanceTransaction } from "./stake-pool/instructions";
 import { WalletAdapter, TransactionSequence, TransactionSequenceSignatures, TransactionWithSigners, TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS } from "./transactions";
 import { signAndSendTransactionSequence } from ".";
+import { Fee, StakePool } from "./stake-pool/schema";
 
 export class Socean {
   private readonly config: SoceanConfig;
@@ -221,6 +223,33 @@ export class Socean {
       );
     }
     return res;
+  }
+
+
+  /**
+   * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
+   * by the user for staking SOL, with deposit fees factored in.
+   * Note: if an epoch boundary crosses and the stake pool is updated, the scnSOL supply
+   * will no longer match and the result of this function will be incorrect
+   * @param lamportsToStake amount of SOL to be staked, in lamports
+   * @param stakePool the stake pool to stake to
+   * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
+   */
+  static calcDropletsReceivedForSolDeposit(lamportsToStake: Numberu64, stakePool: StakePool): Numberu64 {
+    return calcDropletsReceivedForDeposit(lamportsToStake, stakePool, stakePool.solDepositFee);
+  }
+
+  /**
+   * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
+   * by the user for staking stake account(s), with deposit fees factored in.
+   * Note: if an epoch boundary crosses and the stake pool is updated, the scnSOL supply
+   * will no longer match and the result of this function will be incorrect
+   * @param lamportsToStake SOL value of the stake accounts to be staked, in lamports
+   * @param stakePool the stake pool to stake to
+   * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
+   */
+  static calcDropletsReceivedForStakeDeposit(lamportsToStake: Numberu64, stakePool: StakePool): Numberu64 {
+    return calcDropletsReceivedForDeposit(lamportsToStake, stakePool, stakePool.stakeDepositFee);
   }
 
   private async signAndSend(
