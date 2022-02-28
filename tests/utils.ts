@@ -2,6 +2,7 @@ import { LAMPORTS_PER_SOL, Connection, Transaction, PublicKey, Keypair, StakePro
 import { readFileSync } from 'fs';
 import { WalletAdapter } from '../src';
 import path from 'path';
+import { STAKE_STATE_LEN } from '../src/stake-pool/types';
 
 export const airdrop = async (connection: Connection, pubkey: PublicKey, amount: number = 1): Promise<void> => {
   //airdrop tokens
@@ -73,6 +74,116 @@ export const transferStakeAcc = async (connection: Connection, stakeAccount: Pub
   const tx = transferAuthTxs[1];
   tx.add(transferAuthTxs[0].instructions[0]);
   await connection.sendTransaction(tx, [owner]);
+}
+
+// TODO: verify these transaction limits
+const MAX_STAKE_DEACTIVATE_IX_PER_TX = 10;
+const MAX_STAKE_WITHDRAW_IX_PER_TX = 6;
+
+/**
+ * For being nice to testnet and not taking too much storage.
+ * Clean up all stake accounts owned by `owner` by:
+ * - deactivating all active stake accounts
+ * - deleting all inactive stake accounts
+ * @param connection 
+ * @param owner 
+ * @returns 
+ */
+export const cleanupAllStakeAccs = async (connection: Connection, owner: Keypair) => {
+  const allStakeAccounts = await getAllStakeAccounts(connection, owner.publicKey);
+  for (let i = 0; i < allStakeAccounts.active.length; i += MAX_STAKE_DEACTIVATE_IX_PER_TX) {
+    const chunk = allStakeAccounts.active.slice(i, Math.min(allStakeAccounts.active.length, i + MAX_STAKE_DEACTIVATE_IX_PER_TX));
+    const tx = chunk.reduce((tx, { pubkey }) => {
+      tx.add(StakeProgram.deactivate({
+        authorizedPubkey: owner.publicKey,
+        stakePubkey: pubkey,
+      }).instructions[0]);
+      return tx;
+    }, new Transaction());
+    await connection.sendTransaction(tx, [owner]);
+  }
+  for (let i = 0; i < allStakeAccounts.inactive.length; i += MAX_STAKE_WITHDRAW_IX_PER_TX) {
+    const chunk = allStakeAccounts.inactive.slice(i, Math.min(allStakeAccounts.inactive.length, i + MAX_STAKE_WITHDRAW_IX_PER_TX));
+    const tx = chunk.reduce((tx, { pubkey, lamports }) => {
+      tx.add(StakeProgram.withdraw({
+        authorizedPubkey: owner.publicKey,
+        lamports,
+        stakePubkey: pubkey,
+        toPubkey: owner.publicKey,
+      }).instructions[0]);
+      return tx;
+    }, new Transaction());
+    await connection.sendTransaction(tx, [owner]);
+  }
+}
+
+type ReqStakeAccountData = {
+  pubkey: PublicKey,
+  lamports: number,
+}
+
+type UserStakeAccounts = {
+  activating: ReqStakeAccountData[],
+  active: ReqStakeAccountData[],
+  deactivating: ReqStakeAccountData[],
+  inactive: ReqStakeAccountData[],
+}
+
+const STAKE_ACCOUNT_WITHDRAW_AUTHORITY_OFFSET = 44;
+
+interface ParsedStakeAccount {
+  delegation: {
+    activationEpoch: string;
+    deactivationEpoch: string;
+  }
+}
+
+type StakeActivationState = keyof UserStakeAccounts; 
+
+const getAllStakeAccounts = async (connection: Connection, owner: PublicKey): Promise<UserStakeAccounts> => {
+  const { epoch } = await connection.getEpochInfo();
+  const parsedStakeAccounts = await connection.getParsedProgramAccounts(
+    StakeProgram.programId,
+    {
+      filters: [
+        { dataSize: STAKE_STATE_LEN },
+        {
+          memcmp: {
+            offset: STAKE_ACCOUNT_WITHDRAW_AUTHORITY_OFFSET,
+            bytes: owner.toBase58(),
+          },
+        },
+      ],
+    },
+  );
+  return parsedStakeAccounts.reduce((res, account) => {
+    const activationState = determineStakeActivation(
+      // @ts-ignore
+      account.account.data.parsed.info.stake as StakeActivationState,
+      epoch
+    );
+    res[activationState].push({
+      pubkey: account.pubkey,
+      lamports: account.account.lamports,
+    });
+    return res;
+  }, {
+    activating: [],
+    active: [],
+    deactivating: [],
+    inactive: [],
+  })
+}
+
+const EPOCH_MAX = "18446744073709551615";
+
+const determineStakeActivation = (parsedStakeAccount: ParsedStakeAccount, currentEpoch: number): StakeActivationState => {
+  const { delegation: { activationEpoch, deactivationEpoch } } = parsedStakeAccount;
+  if (activationEpoch === EPOCH_MAX) return "inactive";
+  else if (Number(activationEpoch) >= currentEpoch) return "activating";
+  else if (deactivationEpoch === EPOCH_MAX) return "active";
+  else if (Number(deactivationEpoch) >= currentEpoch) return "deactivating";
+  else return "inactive";
 }
 
 // corresponding numeric values for stake program authority enum
