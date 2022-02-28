@@ -74,7 +74,7 @@ describe('test basic functionalities', () => {
     before(async () => {
       connection = new Connection(clusterApiUrl("testnet"));
       // prep wallet and airdrop SOL if necessary
-      ({ stakerKeypair, staker, originalBalanceLamports } = await prepareStaker(connection, 0));
+      ({ stakerKeypair, staker, originalBalanceLamports } = await prepareStaker(connection));
       console.log("staker:", staker.publicKey.toBase58());
       console.log("original balance:", originalBalanceLamports);
 
