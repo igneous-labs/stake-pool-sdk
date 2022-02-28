@@ -103,7 +103,7 @@ export const cleanupAllStakeAccs = async (connection: Connection, owner: Keypair
     await connection.sendTransaction(tx, [owner]);
   }
   for (let i = 0; i < allStakeAccounts.inactive.length; i += MAX_STAKE_WITHDRAW_IX_PER_TX) {
-    const chunk = allStakeAccounts.inactive.slice(i, Math.min(allStakeAccounts.inactive.length, i + MAX_STAKE_DEACTIVATE_IX_PER_TX));
+    const chunk = allStakeAccounts.inactive.slice(i, Math.min(allStakeAccounts.inactive.length, i + MAX_STAKE_WITHDRAW_IX_PER_TX));
     const tx = chunk.reduce((tx, { pubkey, lamports }) => {
       tx.add(StakeProgram.withdraw({
         authorizedPubkey: owner.publicKey,
