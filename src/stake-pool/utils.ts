@@ -158,9 +158,12 @@ export async function calcWithdrawals(
       dropletsServiced,
       stakePool
     );
-    if (withdrawalReceipt.lamportsReceived > lamports) {
+    if (withdrawalReceipt.lamportsReceived.gt(lamports)) {
       // rounding error happened somewhere
-      throw new WithdrawalUnserviceableError();
+      throw new WithdrawalUnserviceableError(
+        `Stake account ${stakeAccount.toString()} only has ${lamports.toNumber()} lamports`
+        + `, not enough to service requested ${withdrawalReceipt.lamportsReceived.toNumber()} withdrawal`
+      );
     }
 
     res.push({
@@ -170,9 +173,16 @@ export async function calcWithdrawals(
     dropletsRemaining = dropletsRemaining.sub(dropletsServiced);
   }
 
+  // might happen if many transient stake accounts
   if (!dropletsRemaining.isZero()) {
-    // might happen if many transient stake accounts
-    throw new WithdrawalUnserviceableError();
+    // try using the reserves
+    res.push({
+      stakeAccount: stakePool.reserveStake,
+      withdrawalReceipt: calcWithdrawalReceipt(
+        dropletsRemaining,
+        stakePool,
+      ),
+    });
   }
   
   return res;
@@ -507,7 +517,8 @@ export async function getDefaultDepositAuthority(
  */
 function calcDropletsReceivedForDeposit(lamportsToStake: Numberu64, stakePool: schema.StakePool, depositFee: schema.Fee): Numberu64 {
   const dropletsMinted = lamportsToStake.mul(stakePool.poolTokenSupply).div(stakePool.totalStakeLamports);
-  const depositFeeDroplets = depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator);
+  const hasFee = !depositFee.numerator.isZero() && !depositFee.denominator.isZero();
+  const depositFeeDroplets = hasFee ? depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator) : new Numberu64(0);
   return dropletsMinted.sub(depositFeeDroplets);
 }
 

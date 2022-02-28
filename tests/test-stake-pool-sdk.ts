@@ -61,7 +61,7 @@ describe('test basic functionalities', () => {
     }
   });
 
-  describe('testnet executions', () => {
+  describe('devnet executions', () => {
     let connection: Connection;
     let stakerKeypair: Keypair;
     let staker: MockWalletAdapter;
@@ -71,13 +71,13 @@ describe('test basic functionalities', () => {
     let scnSolAtaPubkey: PublicKey;
 
     before(async () => {
-      connection = new Connection(clusterApiUrl("testnet"));
+      connection = new Connection(clusterApiUrl("devnet"));
       // prep wallet and airdrop SOL if necessary
-      ({ stakerKeypair, staker, originalBalanceLamports } = await prepareStaker(connection, 0));
+      ({ stakerKeypair, staker, originalBalanceLamports } = await prepareStaker(connection));
       console.log("staker:", staker.publicKey.toBase58());
       console.log("original balance:", originalBalanceLamports);
 
-      const socean = new Socean();
+      const socean = new Socean("devnet");
       const stakePool = await socean.getStakePoolAccount();
       scnSolMintPubkey = stakePool.account.data.poolMint;
       scnSolToken = new Token(
@@ -95,7 +95,7 @@ describe('test basic functionalities', () => {
     });
 
     it('it deposits and withdraws on testnet', async () => {
-      const socean = new Socean();
+      const socean = new Socean("devnet");
   
       // deposit 0.5 sol
       const depositAmountSol = 0.5;
@@ -142,7 +142,7 @@ describe('test basic functionalities', () => {
     });
 
     it("it calcDropletsReceivedForSolDeposit() matches actual droplets received", async () => {
-      const socean = new Socean();
+      const socean = new Socean("devnet");
       const stakePool = await socean.getStakePoolAccount();
       let scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
       const initialScnSolBalance = scnSolAtaAcctInfo.amount;
@@ -162,7 +162,7 @@ describe('test basic functionalities', () => {
     });
 
     after(async () => {
-      await cleanupAllStakeAccs(new Connection(clusterApiUrl("testnet")), stakerKeypair);
+      await cleanupAllStakeAccs(connection, stakerKeypair);
       // delete scnSOL ATA
       const scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
       if (scnSolAtaAcctInfo.amount.gt(new Numberu64(0))) {

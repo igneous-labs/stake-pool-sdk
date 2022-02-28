@@ -32,7 +32,7 @@ export class AccountDoesNotExistError extends Error {
  * The withdraw request is not serviceable (should never be thrown)
  */
 export class WithdrawalUnserviceableError extends Error {
-  constructor() {
+  constructor(public readonly reason: string = "") {
     super("Could not determine withdrawal procedure");
   }
 }
