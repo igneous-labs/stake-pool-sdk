@@ -23,7 +23,7 @@ describe('test basic functionalities', () => {
   it('it initializes devnet and gets stake pool account', async () => {
     const socean = new Socean('devnet');
     const res = await socean.getStakePoolAccount();
-    expect(res.account.data.poolMint.toString()).to.eq("J87WQGupHC272BerSZCEbGEETp8qUdrV2n4UFeRWcE3H");
+    expect(res.account.data.poolMint.toString()).to.eq("6JWhqnxxkqvmkr23yDpsL1atjeiF6jpNAtV8AozZN5Qq");
   })
 
   it('it generates deposit sol tx', async () => {

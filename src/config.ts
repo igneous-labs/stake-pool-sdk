@@ -15,8 +15,8 @@ const TESTNET_STAKEPOOL_PROGRAM_ID = "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9
 const MAINNET_STAKEPOOL_ACCOUNT = "5oc4nmbNTda9fx8Tw57ShLD132aqDK65vuHH4RU1K4LZ";
 const MAINNET_STAKEPOOL_PROGRAM_ID = "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx";
 
-const DEVNET_STAKEPOOL_ACCOUNT = "5EZy4hRbtfC2FGSFN94XdbJGoyvc9Gr7ELt5pYdAettt";
-const DEVNET_STAKEPOOL_PROGRAM_ID = "6owLUGBUHfbze4B3BHxRyKjoqn9hGA6SnFSgc4VncvGz";
+const DEVNET_STAKEPOOL_ACCOUNT = "6NjY29fsq34pTqEmu2CXqGijsGLDSPdHqEyJ3fBkMxtB";
+const DEVNET_STAKEPOOL_PROGRAM_ID = "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx";
 
 export type ClusterType = 'mainnet-beta' | 'testnet' | 'devnet';
 
