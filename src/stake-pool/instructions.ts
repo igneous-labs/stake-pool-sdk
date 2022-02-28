@@ -118,7 +118,7 @@ export const depositSolInstruction = (
  * @param managerFeeAccount: Pubkey of the pool token account receiving the stake pool's fees.
  * @param poolMint: Pubkey of the pool token mint
  * @param tokenProgramId: Pubkey of the SPL token program
- * @param amount: number of pool tokens to withdraw
+ * @param dropletsToUnstake: number of droplets to withdraw
  */
 export function withdrawStakeInstruction(
   stakePoolProgramId: PublicKey,
@@ -133,7 +133,7 @@ export function withdrawStakeInstruction(
   managerFeeAccount: PublicKey,
   poolMint: PublicKey,
   tokenProgramId: PublicKey,
-  amount: number | Numberu64,
+  dropletsToUnstake: Numberu64,
 ): TransactionInstruction {
   const dataLayout = struct<{
     instruction: number;
@@ -144,7 +144,7 @@ export function withdrawStakeInstruction(
   dataLayout.encode(
     {
       instruction: StakePoolInstruction.WithdrawStake,
-      amount: new Numberu64(amount).toBuffer(),
+      amount: dropletsToUnstake.toBuffer(),
     },
     data,
   );

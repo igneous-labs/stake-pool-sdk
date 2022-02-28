@@ -18,7 +18,7 @@ export class RpcError extends Error {
  * Given account does not exist
  */
 export class AccountDoesNotExistError extends Error {
-  readonly account: PublicKey
+  readonly account: PublicKey;
 
   constructor(
     account: PublicKey,

@@ -18,7 +18,6 @@ import {
   getWithdrawAuthority,
   getWithdrawStakeTransactions,
   validatorsToWithdrawFrom,
-  calcPoolPriceAndFee,
   tryRpc,
   getValidatorStakeAccount,
   getValidatorTransientStakeAccount,
@@ -187,19 +186,12 @@ export class Socean {
     // get ValidatorListAccount
     const validatorListAcc = await this.getValidatorListAccount(stakePool.account.data.validatorList);
 
-    // get price and fee information and calculate the amounts
-    const [price, fee] = calcPoolPriceAndFee(stakePool);
-    const fromAmountDroplets = amountDroplets.toNumber();
-    const toAmountLamports = (1 - fee) * (fromAmountDroplets * price);
-
     // calculate the amounts to withdraw from for each validator
-    const amounts = await validatorsToWithdrawFrom(
+    const dropletsWithdrawnPerValidator = await validatorsToWithdrawFrom(
       new PublicKey(this.config.stakePoolProgramId),
-      new PublicKey(this.config.stakePoolAccountPubkey),
-      fromAmountDroplets,
-      toAmountLamports,
+      stakePool,
+      amountDroplets,
       validatorListAcc.account.data,
-      stakePool.account.data.reserveStake,
     );
 
     const [transactions, stakeAccounts] = await getWithdrawStakeTransactions(
@@ -208,7 +200,7 @@ export class Socean {
       this.config.stakePoolProgramId,
       stakePool,
       validatorListAcc,
-      amounts,
+      dropletsWithdrawnPerValidator,
     );
     const res = {
       transactionSequence: [transactions],
