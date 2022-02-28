@@ -5,7 +5,7 @@
  *
  * @module
  */
-import { Transaction, PublicKey, Keypair } from "@solana/web3.js";
+import { Transaction, PublicKey, Keypair, ConfirmOptions } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import BN from "bn.js";
 
@@ -21,17 +21,20 @@ import {
   calcPoolPriceAndFee,
   tryRpc,
   getValidatorStakeAccount,
+  getValidatorTransientStakeAccount,
+  calcDropletsReceivedForDeposit,
 } from "./stake-pool/utils";
 import { AccountDoesNotExistError, WalletPublicKeyUnavailableError } from "./err";
 import { cleanupRemovedValidatorsInstruction, depositSolInstruction, updateStakePoolBalanceInstruction, updateValidatorListBalanceTransaction } from "./stake-pool/instructions";
-import { WalletAdapter, TransactionSequence, TransactionSequenceSignatures, TransactionWithSigners } from "./transactions";
+import { WalletAdapter, TransactionSequence, TransactionSequenceSignatures, TransactionWithSigners, TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS } from "./transactions";
 import { signAndSendTransactionSequence } from ".";
+import { StakePool } from "./stake-pool/schema";
 
 export class Socean {
   private readonly config: SoceanConfig;
 
-  constructor(clusterType: ClusterType = 'testnet') {
-    this.config = new SoceanConfig(clusterType);
+  constructor(clusterType: ClusterType = 'testnet', rpcEndpoint?: string) {
+    this.config = new SoceanConfig(clusterType, rpcEndpoint);
   }
 
   /**
@@ -39,7 +42,8 @@ export class Socean {
    * into the Socean stake pool
    * @param walletAdapter SOL wallet to deposit SOL from
    * @param amountLamports amount to deposit in lamports
-   * @param referrerPoolTokenAccount PublicKey of the referrer for this deposit
+   * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
+   * @param confirmOptions transaction confirm options for each transaction
    * @returns the transaction signatures of the transactions sent and confirmed
    * @throws RpcError
    * @throws AccountDoesNotExistError if stake pool does not exist
@@ -49,6 +53,7 @@ export class Socean {
     walletAdapter: WalletAdapter,
     amountLamports: Numberu64,
     referrerPoolTokenAccount?: PublicKey,
+    confirmOptions: ConfirmOptions = TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS,
   ): Promise<TransactionSequenceSignatures> {
     const walletPubkey = walletAdapter.publicKey;
     if (!walletPubkey) throw new WalletPublicKeyUnavailableError();
@@ -59,7 +64,8 @@ export class Socean {
     );
     return this.signAndSend(
       walletAdapter,
-      txSeq
+      txSeq,
+      confirmOptions,
     );
   }
 
@@ -70,7 +76,7 @@ export class Socean {
    * This is a lower-level API for compatibility, recommend using `depositSol()` instead if possible.
    * @param walletPubkey SOL wallet to deposit SOL from
    * @param amountLamports amount to deposit in lamports
-   * @param referrerPoolTokenAccount PublicKey of the referrer for this deposit
+   * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
    * @returns the deposit transaction sequence
    * @throws RpcError
    * @throws AccountDoesNotExistError if stake pool does not exist
@@ -130,6 +136,7 @@ export class Socean {
    * Signs, sends and confirms the transactions required to withdraw stake from the Socean stake pool
    * @param walletAdapter the SOL wallet to withdraw stake to. scnSOL is deducted from this wallet's associated token account.
    * @param amountDroplets amount of scnSOL to withdraw in droplets (1 scnSOL = 10^9 droplets)
+   * @param confirmOptions transaction confirm options for each transaction
    * @returns the transaction signatures of the transactions sent and confirmed
    *          and the newly created stake accounts to receive the withdrawn stake
    * @throws RpcError
@@ -139,6 +146,7 @@ export class Socean {
   async withdrawStake(
     walletAdapter: WalletAdapter,
     amountDroplets: Numberu64,
+    confirmOptions: ConfirmOptions = TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS,
   ): Promise<WithdrawStakeReturn> {
     const walletPubkey = walletAdapter.publicKey;
     if (!walletPubkey) throw new WalletPublicKeyUnavailableError();
@@ -148,7 +156,8 @@ export class Socean {
     );
     const transactionSignatures = await this.signAndSend(
       walletAdapter,
-      transactionSequence
+      transactionSequence,
+      confirmOptions,
     );
     return {
       transactionSignatures,
@@ -216,14 +225,43 @@ export class Socean {
     return res;
   }
 
+
+  /**
+   * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
+   * by the user for staking SOL, with deposit fees factored in.
+   * Note: if an epoch boundary crosses and the stake pool is updated, the scnSOL supply
+   * will no longer match and the result of this function will be incorrect
+   * @param lamportsToStake amount of SOL to be staked, in lamports
+   * @param stakePool the stake pool to stake to
+   * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
+   */
+  static calcDropletsReceivedForSolDeposit(lamportsToStake: Numberu64, stakePool: StakePool): Numberu64 {
+    return calcDropletsReceivedForDeposit(lamportsToStake, stakePool, stakePool.solDepositFee);
+  }
+
+  /**
+   * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
+   * by the user for staking stake account(s), with deposit fees factored in.
+   * Note: if an epoch boundary crosses and the stake pool is updated, the scnSOL supply
+   * will no longer match and the result of this function will be incorrect
+   * @param lamportsToStake SOL value of the stake accounts to be staked, in lamports
+   * @param stakePool the stake pool to stake to
+   * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
+   */
+  static calcDropletsReceivedForStakeDeposit(lamportsToStake: Numberu64, stakePool: StakePool): Numberu64 {
+    return calcDropletsReceivedForDeposit(lamportsToStake, stakePool, stakePool.stakeDepositFee);
+  }
+
   private async signAndSend(
     walletAdapter: WalletAdapter,
     transactionSequence: TransactionSequence,
+    confirmOptions: ConfirmOptions,
   ): Promise<TransactionSequenceSignatures> {
     return signAndSendTransactionSequence(
       walletAdapter,
       transactionSequence,
       this.config.connection,
+      confirmOptions,
     );
   }
 
@@ -256,8 +294,8 @@ export class Socean {
       }
     }} = stakePool;
 
-    const updateStakePoolBalanceTx = new Transaction();
-    updateStakePoolBalanceTx.add(updateStakePoolBalanceInstruction(
+    const finalTx = new Transaction();
+    finalTx.add(updateStakePoolBalanceInstruction(
       stakePoolProgramId,
       stakePoolAccountPubkey,
       withdrawAuthority,
@@ -267,23 +305,17 @@ export class Socean {
       poolMint,
       tokenProgramId,
     ));
-    const updateStakePoolBalance = {
-      tx: updateStakePoolBalanceTx,
-      signers: [],
-    }
-
-    const cleanupRemovedValidatorsTx = new Transaction();
-    cleanupRemovedValidatorsTx.add(cleanupRemovedValidatorsInstruction(
+    finalTx.add(cleanupRemovedValidatorsInstruction(
       stakePoolProgramId,
       stakePoolAccountPubkey,
       validatorListAcc.publicKey,
     ));
-    const cleanupRemovedValidators = {
-      tx: cleanupRemovedValidatorsTx,
+    const finalTxWithSigners = {
+      tx: finalTx,
       signers: [],
     }
 
-    return [updateValidatorListBalance, [updateStakePoolBalance], [cleanupRemovedValidators]];
+    return [updateValidatorListBalance, [finalTxWithSigners]];
   }
 
   /**
@@ -378,7 +410,7 @@ export class Socean {
    * @param voteAccount
    */
    async transientStakeAccount(voteAccount: PublicKey): Promise<PublicKey> {
-    return getValidatorStakeAccount(
+    return getValidatorTransientStakeAccount(
       this.config.stakePoolProgramId,
       this.config.stakePoolAccountPubkey,
       voteAccount

@@ -1,4 +1,4 @@
-import { LAMPORTS_PER_SOL, Connection, Transaction, PublicKey, Keypair } from '@solana/web3.js';
+import { LAMPORTS_PER_SOL, Connection, Transaction, PublicKey, Keypair, StakeProgram } from '@solana/web3.js';
 import { readFileSync } from 'fs';
 import { WalletAdapter } from '../src';
 import path from 'path';
@@ -39,3 +39,42 @@ export class MockWalletAdapter implements WalletAdapter {
     return txs;
   }
 }
+
+type PrepareStakerResult = {
+  staker: MockWalletAdapter,
+  stakerKeypair: Keypair,
+  originalBalanceLamports: number,
+}
+
+// prep wallet and airdrop SOL if necessary
+export const prepareStaker = async (connection: Connection, minStartingSol: number = 1): Promise<PrepareStakerResult> => {
+  const stakerKeypair = keypairFromLocalFile("testnet-staker.json");
+  const staker = new MockWalletAdapter(stakerKeypair);
+  let originalBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
+  if (originalBalanceLamports < minStartingSol * LAMPORTS_PER_SOL) {
+      console.log("airdropping", minStartingSol, "SOL to", staker.publicKey.toString(), "...");
+      await airdrop(connection, staker.publicKey, minStartingSol);
+      originalBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
+  }
+  return {
+    staker,
+    stakerKeypair,
+    originalBalanceLamports,
+  };
+}
+
+export const transferStakeAcc = async (connection: Connection, stakeAccount: PublicKey, owner: Keypair, newOwner: PublicKey) => {
+  const transferAuthTxs = [STAKE_AUTHORITY_ENUM, WITHDRAW_AUTHORITY_ENUM].map((authType) => StakeProgram.authorize({
+    authorizedPubkey: owner.publicKey,
+    newAuthorizedPubkey: newOwner,
+    stakeAuthorizationType: { index: authType },
+    stakePubkey: stakeAccount,
+  }));
+  const tx = transferAuthTxs[1];
+  tx.add(transferAuthTxs[0].instructions[0]);
+  await connection.sendTransaction(tx, [owner]);
+}
+
+// corresponding numeric values for stake program authority enum
+export const STAKE_AUTHORITY_ENUM = 0;
+export const WITHDRAW_AUTHORITY_ENUM = 1;

@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "es6",
-    "module": "commonjs",
+    "target": "ES2015",
+    "module": "ES2020",
     "moduleResolution": "node",
     "declaration": true,
     "strict": true,
@@ -29,7 +29,7 @@
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "sourceMap": true,
-    "outDir": "./dist/ts",
+    "outDir": "./dist/esm",
     "rootDir": "./src",
     "types": [
       "node"

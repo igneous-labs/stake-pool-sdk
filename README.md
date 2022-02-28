@@ -1,13 +1,12 @@
-# <div align="center"><a href="https://socean.fi/"><img src="media://logo.png" height="100" alt="Socean"></a></div>
-
-<!--TODO: badges for project license, npm version, size on npm-->
+# <div align="center"><a href="https://socean.fi/"><img src="https://raw.githubusercontent.com/igneous-labs/stake-pool-sdk/master/assets/logo.png" height="100" alt="Socean"></a></div>
 
 <div align="center">
 
-![Build](https://github.com/igneous-labs/stake-pool-sdk/actions/workflows/main.yml/badge.svg)
-![GitHub](https://img.shields.io/github/license/igneous-labs/stake-pool-sdk)
-[![Discord](https://img.shields.io/discord/852171430089981982?label=discord&style=plastic&color=f24f83)](https://discord.com/invite/socean)
-[![Twitter](https://img.shields.io/twitter/follow/soceanfinance?style=plastic&color=f24f83)](https://twitter.com/SoceanFinance)
+[![GitHub branch checks state](https://img.shields.io/github/checks-status/igneous-labs/stake-pool-sdk/master?style=flat)](https://github.com/igneous-labs/stake-pool-sdk)
+[![npm-version](https://img.shields.io/npm/v/@soceanfi/stake-pool-sdk?style=flat)](https://npmjs.com/@soceanfi/stake-pool-sdk)
+[![npm-license](https://img.shields.io/npm/l/@soceanfi/stake-pool-sdk?style=flat)](https://npmjs.com/@soceanfi/stake-pool-sdk)
+[![Discord](https://img.shields.io/discord/852171430089981982?label=discord&style=flat&color=f24f83)](https://discord.com/invite/socean)
+[![Twitter](https://img.shields.io/twitter/follow/soceanfinance?style=flat&color=f24f83)](https://twitter.com/SoceanFinance)
 
 </div>
 
@@ -17,7 +16,7 @@
 [Socean Stake](https://socean.fi/app/stake) is a liquid staking protocol built
 on Solana that delivers the highest risk-free yields on Solana through Socean’s
 algorithmic delegation strategy. Users can stake their SOL tokens with the
-Socean Stake Pool and receive [scnSOL] tokens in return. These [scnSOL] tokens
+[Socean Stake Pool](https://socean.fi/app/stake) and receive [scnSOL] tokens in return. These [scnSOL] tokens
 can be used across Solana’s DeFi ecosystem or can be swapped back to SOL anytime.
 
 [scnSOL]: https://solscan.io/token/5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm
@@ -29,7 +28,7 @@ Contents:
 - [Installation](#installation)
 - [Examples](#examples)
    - [Initialization](#initialization)
-   - [Retreive on-chain state](#retreive-on-chain-state)
+   - [Retrieve on-chain state](#retrieve-on-chain-state)
    - [Stake SOL and receive scnSOL](#stake-sol-and-receive-scnsol)
    - [UnStake scnSOL and receive SOL](#unstake-scnsol-and-receive-sol)
 - [Learn more](#learn-more)
@@ -59,6 +58,9 @@ const socean = new Socean('mainnet-beta');
 
 // or for testnet
 const socean = new Socean(); // or give 'testnet' as the argument
+
+// you can also use a custom rpc endpoint
+const socean = new Socean('mainnet-beta', "https://myawesomerpc.com:8899");
 ```
 
 
@@ -130,5 +132,6 @@ const WithdrawOneDropletFromSoceanButton: FC = () => {
 
 
 ## Learn more
+- [SDK Typedoc](https://stake-pool-sdk.vercel.app/)
 - [Socean stake pool](https://socean.fi)
-- [Socean stake pool documentation](https://docs.socean.fi/)
+- [Socean finance notion](https://soceanfi.notion.site/)
