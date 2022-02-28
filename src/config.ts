@@ -15,7 +15,10 @@ const TESTNET_STAKEPOOL_PROGRAM_ID = "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9
 const MAINNET_STAKEPOOL_ACCOUNT = "5oc4nmbNTda9fx8Tw57ShLD132aqDK65vuHH4RU1K4LZ";
 const MAINNET_STAKEPOOL_PROGRAM_ID = "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx";
 
-export type ClusterType = 'mainnet-beta' | 'testnet';
+const DEVNET_STAKEPOOL_ACCOUNT = "6NjY29fsq34pTqEmu2CXqGijsGLDSPdHqEyJ3fBkMxtB";
+const DEVNET_STAKEPOOL_PROGRAM_ID = "5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx";
+
+export type ClusterType = 'mainnet-beta' | 'testnet' | 'devnet';
 
 /**
  */
@@ -25,12 +28,19 @@ export class SoceanConfig {
     connection: Connection;
 
     constructor(clusterType: ClusterType, rpcEndpoint?: string) {
-        if (clusterType == 'testnet') {
-            this.stakePoolAccountPubkey = new PublicKey(TESTNET_STAKEPOOL_ACCOUNT);
-            this.stakePoolProgramId = new PublicKey(TESTNET_STAKEPOOL_PROGRAM_ID);
-        } else if (clusterType == 'mainnet-beta') {
-            this.stakePoolAccountPubkey = new PublicKey(MAINNET_STAKEPOOL_ACCOUNT);
-            this.stakePoolProgramId = new PublicKey(MAINNET_STAKEPOOL_PROGRAM_ID);
+        switch (clusterType) {
+            case 'testnet':
+                this.stakePoolAccountPubkey = new PublicKey(TESTNET_STAKEPOOL_ACCOUNT);
+                this.stakePoolProgramId = new PublicKey(TESTNET_STAKEPOOL_PROGRAM_ID);
+                break;
+            case 'mainnet-beta':
+                this.stakePoolAccountPubkey = new PublicKey(MAINNET_STAKEPOOL_ACCOUNT);
+                this.stakePoolProgramId = new PublicKey(MAINNET_STAKEPOOL_PROGRAM_ID);
+                break;
+            case 'devnet':
+                this.stakePoolAccountPubkey = new PublicKey(DEVNET_STAKEPOOL_ACCOUNT);
+                this.stakePoolProgramId = new PublicKey(DEVNET_STAKEPOOL_PROGRAM_ID);
+                break;
         }
         this.connection = new Connection(rpcEndpoint ?? clusterApiUrl(clusterType));
     }
