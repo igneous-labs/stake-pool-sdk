@@ -1,9 +1,8 @@
 import { expect } from "chai";
-import { clusterApiUrl, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, StakeProgram, SystemProgram, Transaction } from '@solana/web3.js';
-
+import { clusterApiUrl, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { Numberu64 } from '../src/stake-pool/types';
-import { Socean, WalletAdapter } from '../src';
-import { airdrop, keypairFromLocalFile, MockWalletAdapter, prepareStaker, transferStakeAcc } from './utils';
+import { calcDropletsReceivedForSolDeposit, Socean } from '../src';
+import { MockWalletAdapter, prepareStaker } from './utils';
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 describe('test basic functionalities', () => {
@@ -151,7 +150,7 @@ describe('test basic functionalities', () => {
       // check using a random deposit of 0-0.25 SOL
       const depositAmountSol = Math.random() / 4;
       const depositAmount = Math.round(depositAmountSol * LAMPORTS_PER_SOL);
-      const expectedDroplets = Socean.calcDropletsReceivedForSolDeposit(new Numberu64(depositAmount), stakePool.account.data);
+      const expectedDroplets = calcDropletsReceivedForSolDeposit(new Numberu64(depositAmount), stakePool.account.data);
       // TODO: if an epoch boundary crosses at this point
       // and depositSol() updates the stake pool, the new supply would not match and this test will fail...
       const lastDepositTxId = (await socean.depositSol(staker, new Numberu64(depositAmount))).pop().pop();
