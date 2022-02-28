@@ -3,7 +3,7 @@ import { clusterApiUrl, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, StakeP
 
 import { Numberu64 } from '../src/stake-pool/types';
 import { Socean, WalletAdapter } from '../src';
-import { airdrop, keypairFromLocalFile, MockWalletAdapter, prepareStaker, transferStakeAcc } from './utils';
+import { airdrop, cleanupAllStakeAccs, keypairFromLocalFile, MockWalletAdapter, prepareStaker, transferStakeAcc } from './utils';
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 describe('test basic functionalities', () => {
@@ -74,7 +74,7 @@ describe('test basic functionalities', () => {
     before(async () => {
       connection = new Connection(clusterApiUrl("testnet"));
       // prep wallet and airdrop SOL if necessary
-      ({ stakerKeypair, staker, originalBalanceLamports } = await prepareStaker(connection));
+      ({ stakerKeypair, staker, originalBalanceLamports } = await prepareStaker(connection, 0));
       console.log("staker:", staker.publicKey.toBase58());
       console.log("original balance:", originalBalanceLamports);
 
@@ -163,6 +163,7 @@ describe('test basic functionalities', () => {
     });
 
     after(async () => {
+      await cleanupAllStakeAccs(new Connection(clusterApiUrl("testnet")), stakerKeypair);
       // delete scnSOL ATA
       const scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
       if (scnSolAtaAcctInfo.amount.gt(new Numberu64(0))) {
