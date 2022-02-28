@@ -452,3 +452,17 @@ export async function getDefaultDepositAuthority(
   );
   return key;
 }
+
+/**
+ * Helper function for calculating expected droplets given a deposit and the deposit fee struct
+ * @param lamportsToStake 
+ * @param stakePool 
+ * @param depositFee the Fee struct for the given deposit type,
+ *                   should either be stakePool.solDepositFee or stakePool.stakeDepositFee
+ * @returns expected droplets given in return for staking `lamportsToStake`, with deposit fees factored in
+ */
+export function calcDropletsReceivedForDeposit(lamportsToStake: Numberu64, stakePool: schema.StakePool, depositFee: schema.Fee): Numberu64 {
+  const dropletsMinted = lamportsToStake.mul(stakePool.poolTokenSupply).div(stakePool.totalStakeLamports);
+  const depositFeeDroplets = depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator);
+  return dropletsMinted.sub(depositFeeDroplets);
+}

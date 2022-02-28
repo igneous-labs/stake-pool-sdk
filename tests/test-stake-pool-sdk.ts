@@ -3,8 +3,8 @@ import { clusterApiUrl, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, StakeP
 
 import { Numberu64 } from '../src/stake-pool/types';
 import { Socean, WalletAdapter } from '../src';
-import { airdrop, keypairFromLocalFile, MockWalletAdapter } from './utils';
-import { Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { airdrop, keypairFromLocalFile, MockWalletAdapter, prepareStaker, transferStakeAcc } from './utils';
+import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 describe('test basic functionalities', () => {
   it('it initializes and gets stake pool account', async () => {
@@ -62,86 +62,115 @@ describe('test basic functionalities', () => {
     }
   });
 
-  it('it deposits and withdraws on testnet', async () => {
-    const socean = new Socean();
-    const connection = new Connection(clusterApiUrl("testnet"));
+  describe('testnet executions', () => {
+    let connection: Connection;
+    let stakerKeypair: Keypair;
+    let staker: MockWalletAdapter;
+    let originalBalanceLamports: number;
+    let scnSolMintPubkey: PublicKey;
+    let scnSolToken: Token;
+    let scnSolAtaPubkey: PublicKey;
 
-    // prep wallet and airdrop SOL if necessary
-    const stakerKeypair = keypairFromLocalFile("testnet-staker.json");
-    const staker: WalletAdapter = new MockWalletAdapter(stakerKeypair);
-    const airdropSol = 1;
-    let originalBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
-    if (originalBalanceLamports < airdropSol * LAMPORTS_PER_SOL) {
-        console.log("airdropping", airdropSol, "SOL to", staker.publicKey.toString(), "...");
-        await airdrop(connection, staker.publicKey, airdropSol);
-        originalBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
-    }
-    console.log("staker:", staker.publicKey.toBase58());
-    console.log("original balance:", originalBalanceLamports);
+    before(async () => {
+      connection = new Connection(clusterApiUrl("testnet"));
+      // prep wallet and airdrop SOL if necessary
+      ({ stakerKeypair, staker, originalBalanceLamports } = await prepareStaker(connection));
+      console.log("staker:", staker.publicKey.toBase58());
+      console.log("original balance:", originalBalanceLamports);
 
-    // deposit 0.5 sol
-    const depositAmountSol = 0.5;
-    const depositAmount = depositAmountSol * LAMPORTS_PER_SOL;
-    console.log("deposit amount:", depositAmount);
-    const lastDepositTxId = (await socean.depositSol(staker, new Numberu64(depositAmount))).pop().pop();
-    // wait until the last tx (deposit) is finalized
-    await connection.confirmTransaction(lastDepositTxId, "finalized");
-    console.log("deposit tx id: ", lastDepositTxId);
-
-    // assert the balance decreased by ~0.5
-    const afterDepositBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
-    console.log("balance after deposit:", afterDepositBalanceLamports);
-    expect(afterDepositBalanceLamports).to.be.below(originalBalanceLamports - depositAmountSol * LAMPORTS_PER_SOL);
-
-    // assert scnSOL balance > 0
-    const stakePool = await socean.getStakePoolAccount();
-    const scnSolMint = stakePool.account.data.poolMint;
-    const scnSolToken = new Token(
-      connection,
-      scnSolMint,
-      TOKEN_PROGRAM_ID,
-      stakerKeypair,
-    );
-    let scnSolAcct = await scnSolToken.getOrCreateAssociatedAccountInfo(staker.publicKey);
-    const scnSolAmt = scnSolAcct.amount;
-    expect(scnSolAmt.toNumber()).to.be.above(0);
-
-    // withdraw all scnSOL
-    const { transactionSignatures, stakeAccounts } = await socean.withdrawStake(staker, scnSolAmt);
-    const lastWithdrawTxId = transactionSignatures.pop().pop();
-    // wait until the last tx (withdraw) is finalized
-    await connection.confirmTransaction(lastWithdrawTxId, "finalized");
-
-    // assert scnSOL account empty
-    scnSolAcct = await scnSolToken.getOrCreateAssociatedAccountInfo(staker.publicKey);
-    expect(scnSolAcct.amount.toNumber()).to.eq(0);
-
-    // assert stake accounts present after withdrawal and have stake
-    const stakeAccountPubkeys = stakeAccounts.map((stakeAccount) => stakeAccount.publicKey);
-    const allStakeAccounts = await connection.getMultipleAccountsInfo(stakeAccountPubkeys);
-    allStakeAccounts.map(async (stakeAccount, i) => {
-      const { data } = stakeAccount;
-      if (data instanceof Buffer) {
-        throw new Error("expected stake account, got Buffer");
-      }
-      // @ts-ignore
-      expect(data.delegation.stake.toNumber()).to.be.above(0);
-
-      // cleanup: send account to manager
-      // 0 is stake authority, 1 is withdraw authority
-      const transferAuthTxs = [0, 1].map((authType) => StakeProgram.authorize({
-        authorizedPubkey: staker.publicKey,
-        newAuthorizedPubkey: stakePool.account.data.manager,
-        stakeAuthorizationType: { index: authType },
-        stakePubkey: stakeAccountPubkeys[i],
-      }));
-      const tx = transferAuthTxs[1];
-      tx.add(transferAuthTxs[0].instructions[0]);
-      await connection.sendTransaction(tx, [stakerKeypair]);
+      const socean = new Socean();
+      const stakePool = await socean.getStakePoolAccount();
+      scnSolMintPubkey = stakePool.account.data.poolMint;
+      scnSolToken = new Token(
+        connection,
+        scnSolMintPubkey,
+        TOKEN_PROGRAM_ID,
+        stakerKeypair,
+      );
+      scnSolAtaPubkey = await Token.getAssociatedTokenAddress(
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
+        scnSolMintPubkey,
+        staker.publicKey,
+      );
     });
 
-    // cleanup: delete temp accounts to be nice to testnet
-    console.log("deleting scnSOL ATA...");
-    await scnSolToken.closeAccount(scnSolAcct.address, staker.publicKey, stakerKeypair, []);
-  });
+    it('it deposits and withdraws on testnet', async () => {
+      const socean = new Socean();
+  
+      // deposit 0.5 sol
+      const depositAmountSol = 0.5;
+      const depositAmount = depositAmountSol * LAMPORTS_PER_SOL;
+      console.log("deposit amount:", depositAmount);
+      const lastDepositTxId = (await socean.depositSol(staker, new Numberu64(depositAmount))).pop().pop();
+      // wait until the last tx (deposit) is finalized
+      await connection.confirmTransaction(lastDepositTxId, "finalized");
+      console.log("deposit tx id: ", lastDepositTxId);
+  
+      // assert the balance decreased by ~0.5
+      const afterDepositBalanceLamports = await connection.getBalance(staker.publicKey, "finalized");
+      console.log("balance after deposit:", afterDepositBalanceLamports);
+      expect(afterDepositBalanceLamports).to.be.below(originalBalanceLamports - depositAmountSol * LAMPORTS_PER_SOL);
+  
+      // assert scnSOL balance > 0
+      let scnSolAcct = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
+      const scnSolAmt = scnSolAcct.amount;
+      expect(scnSolAmt.toNumber()).to.be.above(0);
+  
+      // withdraw all scnSOL
+      const { transactionSignatures, stakeAccounts } = await socean.withdrawStake(staker, scnSolAmt);
+      const lastWithdrawTxId = transactionSignatures.pop().pop();
+      // wait until the last tx (withdraw) is finalized
+      await connection.confirmTransaction(lastWithdrawTxId, "finalized");
+  
+      // assert scnSOL account empty
+      scnSolAcct = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
+      expect(scnSolAcct.amount.toNumber()).to.eq(0);
+  
+      // assert stake accounts present after withdrawal and have stake
+      const stakeAccountPubkeys = stakeAccounts.map((stakeAccount) => stakeAccount.publicKey);
+  
+      const allStakeAccounts = await connection.getMultipleAccountsInfo(stakeAccountPubkeys);
+      allStakeAccounts.map(async (stakeAccount, i) => {
+        const { data } = stakeAccount;
+        if (data instanceof Buffer) {
+          throw new Error("expected stake account, got Buffer");
+        }
+        // stake account should be parsed, but no type available
+        // @ts-ignore
+        expect(data.delegation.stake.toNumber()).to.be.above(0);
+      });
+    });
+
+    it("it calcDropletsReceivedForSolDeposit() matches actual droplets received", async () => {
+      const socean = new Socean();
+      const stakePool = await socean.getStakePoolAccount();
+      let scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
+      const initialScnSolBalance = scnSolAtaAcctInfo.amount;
+
+      // check using a random deposit of 0-0.25 SOL
+      const depositAmountSol = Math.random() / 4;
+      const depositAmount = Math.round(depositAmountSol * LAMPORTS_PER_SOL);
+      const expectedDroplets = Socean.calcDropletsReceivedForSolDeposit(new Numberu64(depositAmount), stakePool.account.data);
+      // TODO: if an epoch boundary crosses at this point
+      // and depositSol() updates the stake pool, the new supply would not match and this test will fail...
+      const lastDepositTxId = (await socean.depositSol(staker, new Numberu64(depositAmount))).pop().pop();
+      // wait until the last tx (deposit) is finalized
+      await connection.confirmTransaction(lastDepositTxId, "finalized");
+      
+      scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
+      expect(scnSolAtaAcctInfo.amount.toNumber()).to.eq(initialScnSolBalance.add(expectedDroplets).toNumber());
+    });
+
+    after(async () => {
+      // delete scnSOL ATA
+      const scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
+      if (scnSolAtaAcctInfo.amount.gt(new Numberu64(0))) {
+        console.log(`burning remaining ${scnSolAtaAcctInfo.amount.toNumber()} droplets...`);
+        await scnSolToken.burn(scnSolAtaPubkey, stakerKeypair, [], scnSolAtaAcctInfo.amount);
+      }
+      console.log("deleting scnSOL ATA...");
+      await scnSolToken.closeAccount(scnSolAtaPubkey, staker.publicKey, stakerKeypair, []);
+    });
+  })
 });
