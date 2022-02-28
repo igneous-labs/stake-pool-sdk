@@ -625,3 +625,33 @@ function estDropletsUnstakedByWithdrawal(lamportsReceived: Numberu64, stakePool:
   // Note: loss of precision for small estDropletsBurnt
   return estDropletsBurnt.mul(withdrawalFee.denominator).div(base);
 }
+
+/**
+ * Sums up the total number of lamports withdrawn
+ * given an array of `ValidatorWithdrawalReceipt`s
+ * @param receipts 
+ * @returns 
+ */
+export function totalWithdrawLamports(
+  receipts: ValidatorWithdrawalReceipt[]
+): Numberu64 {
+  return receipts.reduce(
+    (accum, receipt) => accum.add(receipt.withdrawalReceipt.lamportsReceived),
+    new Numberu64(0),
+  );
+}
+
+/**
+ * Sums up the total number of droplets (1 / 10 ** 9 scnSOL) paid
+ * in withdrawal fees given an array of `ValidatorWithdrawalReceipt`s
+ * @param receipts 
+ * @returns 
+ */
+export function totalWithdrawalFeesDroplets(
+  receipts: ValidatorWithdrawalReceipt[]
+): Numberu64 {
+  return receipts.reduce(
+    (accum, receipt) => accum.add(receipt.withdrawalReceipt.dropletsFeePaid),
+    new Numberu64(0),
+  );
+}

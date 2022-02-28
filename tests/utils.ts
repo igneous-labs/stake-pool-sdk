@@ -2,7 +2,7 @@ import { LAMPORTS_PER_SOL, Connection, Transaction, PublicKey, Keypair, StakePro
 import { readFileSync } from 'fs';
 import { WalletAdapter } from '../src';
 import path from 'path';
-import { STAKE_STATE_LEN } from '../src/stake-pool/types';
+import { Numberu64, STAKE_STATE_LEN } from '../src/stake-pool/types';
 
 export const airdrop = async (connection: Connection, pubkey: PublicKey, amount: number = 1): Promise<void> => {
   //airdrop tokens
@@ -131,10 +131,13 @@ type UserStakeAccounts = {
 
 const STAKE_ACCOUNT_WITHDRAW_AUTHORITY_OFFSET = 44;
 
-interface ParsedStakeAccount {
+// "jsonParsed" returns all BNs/u64s in strings
+// accountinfo.stake
+interface ParsedStake {
   delegation: {
     activationEpoch: string;
     deactivationEpoch: string;
+    stake: string;
   }
 }
 
@@ -159,7 +162,7 @@ const getAllStakeAccounts = async (connection: Connection, owner: PublicKey): Pr
   return parsedStakeAccounts.reduce((res, account) => {
     const activationState = determineStakeActivation(
       // @ts-ignore
-      account.account.data.parsed.info.stake as StakeActivationState,
+      account.account.data.parsed.info.stake,
       epoch
     );
     res[activationState].push({
@@ -175,15 +178,29 @@ const getAllStakeAccounts = async (connection: Connection, owner: PublicKey): Pr
   })
 }
 
-const EPOCH_MAX = "18446744073709551615";
+const EPOCH_MAX_STRING = "18446744073709551615";
 
-const determineStakeActivation = (parsedStakeAccount: ParsedStakeAccount, currentEpoch: number): StakeActivationState => {
+const determineStakeActivation = (parsedStakeAccount: ParsedStake, currentEpoch: number): StakeActivationState => {
   const { delegation: { activationEpoch, deactivationEpoch } } = parsedStakeAccount;
-  if (activationEpoch === EPOCH_MAX) return "inactive";
+  if (activationEpoch === EPOCH_MAX_STRING) return "inactive";
   else if (Number(activationEpoch) >= currentEpoch) return "activating";
-  else if (deactivationEpoch === EPOCH_MAX) return "active";
+  else if (deactivationEpoch === EPOCH_MAX_STRING) return "active";
   else if (Number(deactivationEpoch) >= currentEpoch) return "deactivating";
   else return "inactive";
+}
+
+export const getStakeAccounts = async (
+  connection: Connection, stakeAccountPubkeys: PublicKey[]
+): Promise<ParsedStake[]> => {
+  const allStakeAccounts = await connection.getMultipleAccountsInfo(
+    stakeAccountPubkeys,
+    { encoding: "jsonParsed" }
+  );
+  return allStakeAccounts.map(
+    // stake account should be parsed automatically, but no type info available
+    // @ts-ignore
+    (stakeAccount) => stakeAccount.data.parsed.info.stake
+  );
 }
 
 // corresponding numeric values for stake program authority enum
