@@ -165,7 +165,6 @@ export async function calcWithdrawals(
         + `, not enough to service requested ${withdrawalReceipt.lamportsReceived.toNumber()} withdrawal`
       );
     }
-
     res.push({
       stakeAccount,
       withdrawalReceipt,
@@ -175,14 +174,11 @@ export async function calcWithdrawals(
 
   // might happen if many transient stake accounts
   if (!dropletsRemaining.isZero()) {
-    // try using the reserves
-    res.push({
-      stakeAccount: stakePool.reserveStake,
-      withdrawalReceipt: calcWithdrawalReceipt(
-        dropletsRemaining,
-        stakePool,
-      ),
-    });
+    // cannot proceed directly to the reserves
+    // unless absolutely all stake accounts (main and transient) are deleted
+    throw new WithdrawalUnserviceableError(
+      "Too many transient stake accounts, please try again on the next epoch"
+    );
   }
   
   return res;
@@ -206,11 +202,17 @@ function validatorsByTotalStakeAsc(
 
 // A validator stake account needs this amount of active staked lamports
 // for the staker to be able to remove the validator from the stake pool.
-const MIN_ACTIVE_STAKE_LAMPORTS = new BN(1_000_000_00); // 0.1 SOL
+const MIN_ACTIVE_STAKE_LAMPORTS = new Numberu64(1_000_000); // 0.001 SOL
+
+// TODO: this might change in the future if rent costs change
+// but since this is a const in the on-chain prog too, fuck it
+const STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS = new Numberu64(2_282_880);
 
 /**
- * Gets the stake available to withdraw from a validator, minus the minimum required to remove the validator
- * and the pubkey of their stake account to withdraw from (either the active or transient stake account)
+ * Gets the stake available to withdraw from a validator.
+ * This is `activeStakeLamports` if there is an active stake account
+ * or `transientStakeLamports` if there is none.
+ * Also returns the pubkey of their stake account to withdraw from (either the active or transient stake account)
  * @param validator `ValidatorStakeInfo` for the validator
  * @param stakePoolProgramId
  * @param stakePoolPubkey
@@ -227,9 +229,15 @@ async function stakeAvailableToWithdraw(
   stakeAccount: PublicKey,
 }> {
   // must withdraw from active stake account if active stake account has non-zero balance
-  const isActive = validator.activeStakeLamports.gt(new Numberu64(0));
-  const totalLamports = isActive ? validator.activeStakeLamports : validator.transientStakeLamports;
-  const lamports = totalLamports.lte(MIN_ACTIVE_STAKE_LAMPORTS) ? new Numberu64(0) : totalLamports;
+  const isActive = !validator.activeStakeLamports.isZero();
+  // this is fucking stupid but 
+  // `transientStakeLamports` = rent exempt reserve + delegation.stake, whereas
+  // `activeStakeLamports` = delegation.stake - MIN_ACTIVE_STAKE_LAMPORTS.
+  // You're only allowed to withdraw delegation.stake - MIN_ACTIVE_STAKE_LAMPORTS lamports.
+  // I've forgotten WHY THE FUCK these 2 values are semantically different in the on-chain prog,
+  // probably to make the merge transient stake to active stake calculation easier
+  const lamports = isActive ? Numberu64.cloneFromBN(validator.activeStakeLamports)
+    : Numberu64.cloneFromBN(validator.transientStakeLamports.sub(STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS).sub(MIN_ACTIVE_STAKE_LAMPORTS));
   const stakeAccount = await (isActive
     ? getValidatorStakeAccount(
         stakePoolProgramId,
@@ -246,7 +254,7 @@ async function stakeAvailableToWithdraw(
 }
 
 function validatorTotalStake(validator: ValidatorStakeInfo): Numberu64 {
-  return validator.activeStakeLamports.add(validator.transientStakeLamports);
+  return Numberu64.cloneFromBN(validator.activeStakeLamports.add(validator.transientStakeLamports));
 }
 
 
@@ -519,7 +527,7 @@ function calcDropletsReceivedForDeposit(lamportsToStake: Numberu64, stakePool: s
   const dropletsMinted = lamportsToStake.mul(stakePool.poolTokenSupply).div(stakePool.totalStakeLamports);
   const hasFee = !depositFee.numerator.isZero() && !depositFee.denominator.isZero();
   const depositFeeDroplets = hasFee ? depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator) : new Numberu64(0);
-  return dropletsMinted.sub(depositFeeDroplets);
+  return Numberu64.cloneFromBN(dropletsMinted.sub(depositFeeDroplets));
 }
 
 /**
@@ -588,20 +596,20 @@ function calcWithdrawalReceipt(dropletsToUnstake: Numberu64, stakePool: schema.S
   const { withdrawalFee, totalStakeLamports, poolTokenSupply } = stakePool;
   // on-chain logic: the withdrawal fee is levied first
   const hasFee = !withdrawalFee.numerator.isZero() && !withdrawalFee.denominator.isZero();
-  const dropletsFeePaid = hasFee ? withdrawalFee.numerator.mul(dropletsToUnstake).div(withdrawalFee.denominator) : new Numberu64(0);
+  const dropletsFeePaid = hasFee ? Numberu64.cloneFromBN(withdrawalFee.numerator.mul(dropletsToUnstake).div(withdrawalFee.denominator)) : new Numberu64(0);
   const dropletsBurnt = dropletsToUnstake.sub(dropletsFeePaid);
   const num = dropletsBurnt.mul(totalStakeLamports);
   if (num.lt(poolTokenSupply) || poolTokenSupply.isZero()) {
     return {
-      dropletsUnstaked: dropletsToUnstake,
+      dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
       lamportsReceived: new Numberu64(0),
       dropletsFeePaid,
     };
   }
   // on-chain logic is ceil div
-  const lamportsReceived = num.add(poolTokenSupply).sub(new Numberu64(1)).div(poolTokenSupply);
+  const lamportsReceived = Numberu64.cloneFromBN(num.add(poolTokenSupply).sub(new Numberu64(1)).div(poolTokenSupply));
   return {
-    dropletsUnstaked: dropletsToUnstake,
+    dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
     lamportsReceived,
     dropletsFeePaid,
   };
@@ -619,11 +627,11 @@ function estDropletsUnstakedByWithdrawal(lamportsReceived: Numberu64, stakePool:
   const estDropletsBurnt = lamportsReceived.mul(poolTokenSupply).div(totalStakeLamports);
   const hasFee = !withdrawalFee.numerator.isZero() && !withdrawalFee.denominator.isZero();
   if (!hasFee) {
-    return estDropletsBurnt;
+    return Numberu64.cloneFromBN(estDropletsBurnt);
   }
   const base = withdrawalFee.denominator.sub(withdrawalFee.numerator);
   // Note: loss of precision for small estDropletsBurnt
-  return estDropletsBurnt.mul(withdrawalFee.denominator).div(base);
+  return Numberu64.cloneFromBN(estDropletsBurnt.mul(withdrawalFee.denominator).div(base));
 }
 
 /**
