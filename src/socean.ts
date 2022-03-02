@@ -56,7 +56,7 @@ import { signAndSendTransactionSequence } from ".";
 import { StakePool } from "./stake-pool/schema";
 
 export class Socean {
-  private readonly config: SoceanConfig;
+  public readonly config: SoceanConfig;
 
   /**
    * Instantiates a Socean client
