@@ -28,7 +28,10 @@ export class SoceanConfig {
   stakePoolProgramId: PublicKey;
   connection: Connection;
 
-  constructor(clusterType: ClusterType, connectionOption: Connection | string) {
+  constructor(
+    clusterType: ClusterType,
+    connectionOption: Connection | string | undefined,
+  ) {
     switch (clusterType) {
       case "testnet":
         this.stakePoolAccountPubkey = new PublicKey(TESTNET_STAKEPOOL_ACCOUNT);

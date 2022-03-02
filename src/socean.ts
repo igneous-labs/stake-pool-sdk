@@ -65,7 +65,7 @@ export class Socean {
    */
   constructor(
     clusterType: ClusterType = "testnet",
-    connectionOption: Connection | string,
+    connectionOption?: Connection | string,
   ) {
     this.config = new SoceanConfig(clusterType, connectionOption);
   }
