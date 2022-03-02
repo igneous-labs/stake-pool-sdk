@@ -5,12 +5,23 @@
  *
  * @module
  */
-import { Transaction, PublicKey, Keypair, ConfirmOptions } from "@solana/web3.js";
+import {
+  Transaction,
+  PublicKey,
+  Keypair,
+  ConfirmOptions,
+  Connection,
+} from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import BN from "bn.js";
 
 import { SoceanConfig, ClusterType } from "./config";
-import { ValidatorListAccount, StakePoolAccount, Numberu64, ValidatorAllStakeAccounts } from "./stake-pool/types";
+import {
+  ValidatorListAccount,
+  StakePoolAccount,
+  Numberu64,
+  ValidatorAllStakeAccounts,
+} from "./stake-pool/types";
 import {
   getStakePoolFromAccountInfo,
   getValidatorListFromAccountInfo,
@@ -24,17 +35,39 @@ import {
   getValidatorTransientStakeAccount,
   calcDropletsReceivedForDeposit,
 } from "./stake-pool/utils";
-import { AccountDoesNotExistError, WalletPublicKeyUnavailableError } from "./err";
-import { cleanupRemovedValidatorsInstruction, depositSolInstruction, updateStakePoolBalanceInstruction, updateValidatorListBalanceTransaction } from "./stake-pool/instructions";
-import { WalletAdapter, TransactionSequence, TransactionSequenceSignatures, TransactionWithSigners, TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS } from "./transactions";
+import {
+  AccountDoesNotExistError,
+  WalletPublicKeyUnavailableError,
+} from "./err";
+import {
+  cleanupRemovedValidatorsInstruction,
+  depositSolInstruction,
+  updateStakePoolBalanceInstruction,
+  updateValidatorListBalanceTransaction,
+} from "./stake-pool/instructions";
+import {
+  WalletAdapter,
+  TransactionSequence,
+  TransactionSequenceSignatures,
+  TransactionWithSigners,
+  TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS,
+} from "./transactions";
 import { signAndSendTransactionSequence } from ".";
 import { StakePool } from "./stake-pool/schema";
 
 export class Socean {
   private readonly config: SoceanConfig;
 
-  constructor(clusterType: ClusterType = 'testnet', rpcEndpoint?: string) {
-    this.config = new SoceanConfig(clusterType, rpcEndpoint);
+  /**
+   * Instantiates a Socean client
+   * @param clusterType The cluster, for eg. mainnet-beta, to connect to
+   * @param connectionOption Accepts either a `Connection` or a `rpcEndpoint` string
+   */
+  constructor(
+    clusterType: ClusterType = "testnet",
+    connectionOption: Connection | string,
+  ) {
+    this.config = new SoceanConfig(clusterType, connectionOption);
   }
 
   /**
@@ -62,11 +95,7 @@ export class Socean {
       amountLamports,
       referrerPoolTokenAccount,
     );
-    return this.signAndSend(
-      walletAdapter,
-      txSeq,
-      confirmOptions,
-    );
+    return this.signAndSend(walletAdapter, txSeq, confirmOptions);
   }
 
   /**
@@ -84,7 +113,7 @@ export class Socean {
   async depositSolTransactions(
     walletPubkey: PublicKey,
     amountLamports: Numberu64,
-    referrerPoolTokenAccount?: PublicKey
+    referrerPoolTokenAccount?: PublicKey,
   ): Promise<TransactionSequence> {
     const stakePool = await this.getStakePoolAccount();
 
@@ -95,11 +124,14 @@ export class Socean {
       this.config.connection,
       stakePool.account.data.poolMint,
       walletPubkey,
-      tx
+      tx,
     );
 
     // prep deposit sol instruction
-    const stakePoolWithdrawAuthority = await getWithdrawAuthority(this.config.stakePoolProgramId, this.config.stakePoolAccountPubkey);
+    const stakePoolWithdrawAuthority = await getWithdrawAuthority(
+      this.config.stakePoolProgramId,
+      this.config.stakePoolAccountPubkey,
+    );
     const ix = depositSolInstruction(
       this.config.stakePoolProgramId,
       this.config.stakePoolAccountPubkey,
@@ -114,20 +146,25 @@ export class Socean {
       amountLamports,
     );
     tx.add(ix);
-    const transactionSequence: TransactionSequence = [[
-      {
-        tx,
-        signers: [],
-      }
-    ]];
+    const transactionSequence: TransactionSequence = [
+      [
+        {
+          tx,
+          signers: [],
+        },
+      ],
+    ];
 
     const currEpoch = await this.getCurrentEpoch();
     if (stakePool.account.data.lastUpdateEpoch.lt(new BN(currEpoch))) {
-      const validatorListAcc = await this.getValidatorListAccount(stakePool.account.data.validatorList);
-      const updateTxSeq = await this.updateTransactionSequence(stakePool, validatorListAcc);
-      transactionSequence.unshift(
-        ...updateTxSeq
+      const validatorListAcc = await this.getValidatorListAccount(
+        stakePool.account.data.validatorList,
       );
+      const updateTxSeq = await this.updateTransactionSequence(
+        stakePool,
+        validatorListAcc,
+      );
+      transactionSequence.unshift(...updateTxSeq);
     }
     return transactionSequence;
   }
@@ -150,10 +187,8 @@ export class Socean {
   ): Promise<WithdrawStakeReturn> {
     const walletPubkey = walletAdapter.publicKey;
     if (!walletPubkey) throw new WalletPublicKeyUnavailableError();
-    const { transactionSequence, stakeAccounts } = await this.withdrawStakeTransactions(
-      walletPubkey,
-      amountDroplets,
-    );
+    const { transactionSequence, stakeAccounts } =
+      await this.withdrawStakeTransactions(walletPubkey, amountDroplets);
     const transactionSignatures = await this.signAndSend(
       walletAdapter,
       transactionSequence,
@@ -181,11 +216,16 @@ export class Socean {
    * @throws WithdrawalUnserviceableError if a suitable withdraw procedure is not found
    */
   // NOTE: amountDroplets is in type Numberu64 to enforce it to be in the unit of droplets (lamports)
-  async withdrawStakeTransactions(walletPubkey: PublicKey, amountDroplets: Numberu64): Promise<WithdrawStakeTransactionsReturn> {
+  async withdrawStakeTransactions(
+    walletPubkey: PublicKey,
+    amountDroplets: Numberu64,
+  ): Promise<WithdrawStakeTransactionsReturn> {
     const stakePool = await this.getStakePoolAccount();
 
     // get ValidatorListAccount
-    const validatorListAcc = await this.getValidatorListAccount(stakePool.account.data.validatorList);
+    const validatorListAcc = await this.getValidatorListAccount(
+      stakePool.account.data.validatorList,
+    );
 
     // get price and fee information and calculate the amounts
     const [price, fee] = calcPoolPriceAndFee(stakePool);
@@ -213,18 +253,18 @@ export class Socean {
     const res = {
       transactionSequence: [transactions],
       stakeAccounts,
-    }
+    };
 
     const currEpoch = await this.getCurrentEpoch();
     if (stakePool.account.data.lastUpdateEpoch.lt(new BN(currEpoch))) {
-      const updateTxSeq = await this.updateTransactionSequence(stakePool, validatorListAcc);
-      res.transactionSequence.unshift(
-        ...updateTxSeq
+      const updateTxSeq = await this.updateTransactionSequence(
+        stakePool,
+        validatorListAcc,
       );
+      res.transactionSequence.unshift(...updateTxSeq);
     }
     return res;
   }
-
 
   /**
    * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
@@ -235,8 +275,15 @@ export class Socean {
    * @param stakePool the stake pool to stake to
    * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
    */
-  static calcDropletsReceivedForSolDeposit(lamportsToStake: Numberu64, stakePool: StakePool): Numberu64 {
-    return calcDropletsReceivedForDeposit(lamportsToStake, stakePool, stakePool.solDepositFee);
+  static calcDropletsReceivedForSolDeposit(
+    lamportsToStake: Numberu64,
+    stakePool: StakePool,
+  ): Numberu64 {
+    return calcDropletsReceivedForDeposit(
+      lamportsToStake,
+      stakePool,
+      stakePool.solDepositFee,
+    );
   }
 
   /**
@@ -248,8 +295,15 @@ export class Socean {
    * @param stakePool the stake pool to stake to
    * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
    */
-  static calcDropletsReceivedForStakeDeposit(lamportsToStake: Numberu64, stakePool: StakePool): Numberu64 {
-    return calcDropletsReceivedForDeposit(lamportsToStake, stakePool, stakePool.stakeDepositFee);
+  static calcDropletsReceivedForStakeDeposit(
+    lamportsToStake: Numberu64,
+    stakePool: StakePool,
+  ): Numberu64 {
+    return calcDropletsReceivedForDeposit(
+      lamportsToStake,
+      stakePool,
+      stakePool.stakeDepositFee,
+    );
   }
 
   private async signAndSend(
@@ -279,41 +333,43 @@ export class Socean {
       stakePoolAccountPubkey,
     );
 
-    const updateValidatorListBalance = await this.updateValidatorListBalanceTransactions(
-      stakePool,
-      validatorListAcc,
-      withdrawAuthority
-    );
+    const updateValidatorListBalance =
+      await this.updateValidatorListBalanceTransactions(
+        stakePool,
+        validatorListAcc,
+        withdrawAuthority,
+      );
 
-    const { account: {
-      data: {
+    const {
+      account: {
+        data: { reserveStake, managerFeeAccount, poolMint, tokenProgramId },
+      },
+    } = stakePool;
+
+    const finalTx = new Transaction();
+    finalTx.add(
+      updateStakePoolBalanceInstruction(
+        stakePoolProgramId,
+        stakePoolAccountPubkey,
+        withdrawAuthority,
+        validatorListAcc.publicKey,
         reserveStake,
         managerFeeAccount,
         poolMint,
         tokenProgramId,
-      }
-    }} = stakePool;
-
-    const finalTx = new Transaction();
-    finalTx.add(updateStakePoolBalanceInstruction(
-      stakePoolProgramId,
-      stakePoolAccountPubkey,
-      withdrawAuthority,
-      validatorListAcc.publicKey,
-      reserveStake,
-      managerFeeAccount,
-      poolMint,
-      tokenProgramId,
-    ));
-    finalTx.add(cleanupRemovedValidatorsInstruction(
-      stakePoolProgramId,
-      stakePoolAccountPubkey,
-      validatorListAcc.publicKey,
-    ));
+      ),
+    );
+    finalTx.add(
+      cleanupRemovedValidatorsInstruction(
+        stakePoolProgramId,
+        stakePoolAccountPubkey,
+        validatorListAcc.publicKey,
+      ),
+    );
     const finalTxWithSigners = {
       tx: finalTx,
       signers: [],
-    }
+    };
 
     return [updateValidatorListBalance, [finalTxWithSigners]];
   }
@@ -343,7 +399,9 @@ export class Socean {
       const chunk = voteAccounts.slice(i, end);
 
       const validatorsAllStakeAccounts = await Promise.all(
-        chunk.map((voteAccount) => this.getValidatorAllStakeAccounts(voteAccount))
+        chunk.map((voteAccount) =>
+          this.getValidatorAllStakeAccounts(voteAccount),
+        ),
       );
 
       res.push({
@@ -376,9 +434,15 @@ export class Socean {
    * @throws AccountDoesNotExistError if stake pool does not exist
    */
   async getStakePoolAccount(): Promise<StakePoolAccount> {
-    const account = await tryRpc(this.config.connection.getAccountInfo(this.config.stakePoolAccountPubkey))
-    if (account === null) throw new AccountDoesNotExistError(this.config.stakePoolAccountPubkey);
-    return getStakePoolFromAccountInfo(this.config.stakePoolAccountPubkey, account);
+    const account = await tryRpc(
+      this.config.connection.getAccountInfo(this.config.stakePoolAccountPubkey),
+    );
+    if (account === null)
+      throw new AccountDoesNotExistError(this.config.stakePoolAccountPubkey);
+    return getStakePoolFromAccountInfo(
+      this.config.stakePoolAccountPubkey,
+      account,
+    );
   }
 
   /**
@@ -387,9 +451,14 @@ export class Socean {
    * @throws RpcError
    * @throws AccountDoesNotExistError if validator list does not exist
    */
-  async getValidatorListAccount(validatorListPubkey: PublicKey): Promise<ValidatorListAccount> {
-    const account = await tryRpc(this.config.connection.getAccountInfo(validatorListPubkey));
-    if (account === null) throw new AccountDoesNotExistError(validatorListPubkey);
+  async getValidatorListAccount(
+    validatorListPubkey: PublicKey,
+  ): Promise<ValidatorListAccount> {
+    const account = await tryRpc(
+      this.config.connection.getAccountInfo(validatorListPubkey),
+    );
+    if (account === null)
+      throw new AccountDoesNotExistError(validatorListPubkey);
     return getValidatorListFromAccountInfo(validatorListPubkey, account);
   }
 
@@ -401,7 +470,7 @@ export class Socean {
     return getValidatorStakeAccount(
       this.config.stakePoolProgramId,
       this.config.stakePoolAccountPubkey,
-      voteAccount
+      voteAccount,
     );
   }
 
@@ -409,11 +478,11 @@ export class Socean {
    * Returns the transient stake account given the validator's vote account
    * @param voteAccount
    */
-   async transientStakeAccount(voteAccount: PublicKey): Promise<PublicKey> {
+  async transientStakeAccount(voteAccount: PublicKey): Promise<PublicKey> {
     return getValidatorTransientStakeAccount(
       this.config.stakePoolProgramId,
       this.config.stakePoolAccountPubkey,
-      voteAccount
+      voteAccount,
     );
   }
 
@@ -421,7 +490,9 @@ export class Socean {
    * Returns both the validator stake account and transient stake account
    * given the validator's vote account
    */
-  async getValidatorAllStakeAccounts(voteAccount: PublicKey): Promise<ValidatorAllStakeAccounts> {
+  async getValidatorAllStakeAccounts(
+    voteAccount: PublicKey,
+  ): Promise<ValidatorAllStakeAccounts> {
     const main = await this.validatorStakeAccount(voteAccount);
     const transient = await this.transientStakeAccount(voteAccount);
     return {
@@ -432,11 +503,11 @@ export class Socean {
 }
 
 type WithdrawStakeTransactionsReturn = {
-  transactionSequence: TransactionSequence,
-  stakeAccounts: Keypair[],
-}
+  transactionSequence: TransactionSequence;
+  stakeAccounts: Keypair[];
+};
 
 type WithdrawStakeReturn = {
-  transactionSignatures: TransactionSequenceSignatures,
-  stakeAccounts: Keypair[],
-}
+  transactionSignatures: TransactionSequenceSignatures;
+  stakeAccounts: Keypair[];
+};
