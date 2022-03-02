@@ -10,7 +10,6 @@
 
 </div>
 
-
 # Socean Stake Pool Typescript SDK
 
 [Socean Stake](https://socean.fi/app/stake) is a liquid staking protocol built
@@ -19,28 +18,35 @@ algorithmic delegation strategy. Users can stake their SOL tokens with the
 [Socean Stake Pool](https://socean.fi/app/stake) and receive [scnSOL] tokens in return. These [scnSOL] tokens
 can be used across Solana’s DeFi ecosystem or can be swapped back to SOL anytime.
 
-[scnSOL]: https://solscan.io/token/5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm
+[scnsol]: https://solscan.io/token/5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm
 
 This SDK provide a client to interact with the staking protocol and allows you
 to stake and unstake through socean stake pool within your applications.
 
 Contents:
-- [Installation](#installation)
-- [Examples](#examples)
-   - [Initialization](#initialization)
-   - [Retrieve on-chain state](#retrieve-on-chain-state)
-   - [Stake SOL and receive scnSOL](#stake-sol-and-receive-scnsol)
-   - [UnStake scnSOL and receive SOL](#unstake-scnsol-and-receive-sol)
-- [Learn more](#learn-more)
 
+- [<div align="center"><a href="https://socean.fi/"><img src="https://raw.githubusercontent.com/igneous-labs/stake-pool-sdk/master/assets/logo.png" height="100" alt="Socean"></a></div>](#div-aligncenterdiv)
+- [Socean Stake Pool Typescript SDK](#socean-stake-pool-typescript-sdk)
+  - [Installation](#installation)
+    - [npm](#npm)
+    - [yarn](#yarn)
+  - [Examples](#examples)
+    - [Initialization](#initialization)
+    - [Retrieve on-chain state](#retrieve-on-chain-state)
+    - [Stake SOL and Receive scnSOL](#stake-sol-and-receive-scnsol)
+    - [Unstake scnSOL and Receive Stake Accounts](#unstake-scnsol-and-receive-stake-accounts)
+  - [Learn more](#learn-more)
 
 ## Installation
+
 ### npm
+
 ```bash
 $ npm install @soceanfi/stake-pool-sdk
 ```
 
 ### yarn
+
 ```bash
 $ yarn add @soceanfi/stake-pool-sdk
 ```
@@ -50,88 +56,83 @@ $ yarn add @soceanfi/stake-pool-sdk
 ### Initialization
 
 Import the main client class `Socean` and initialize it with the desired cluster type:
+
 ```ts
-import { Socean } from '@soceanfi/stake-pool-sdk';
+import { Socean } from "@soceanfi/stake-pool-sdk";
 
 // initializes for mainnet-beta
-const socean = new Socean('mainnet-beta');
+const socean = new Socean("mainnet-beta");
 
 // or for testnet
 const socean = new Socean(); // or give 'testnet' as the argument
 
 // you can also use a custom rpc endpoint
-const socean = new Socean('mainnet-beta', "https://myawesomerpc.com:8899");
+const socean = new Socean("mainnet-beta", "https://myawesomerpc.com:8899");
+
+// or you can also use your own Connection object
+const connection = new Connection(clusterApiUrl("mainnet-beta"));
+const socean = new Socean("mainnet-beta", connection);
 ```
 
-
 ### Retrieve on-chain state
+
 ```ts
 const stakePoolAccount = socean.getStakePoolAccount();
 ```
-
 
 ### Stake SOL and Receive scnSOL
 
 Frontend (react example):
 
 ```tsx
-import { Socean, Numberu64 } from '@soceanfi/stake-pool-sdk';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { FC } from 'react';
+import { Socean, Numberu64 } from "@soceanfi/stake-pool-sdk";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { FC } from "react";
 
-const socean = new Socean('mainnet-beta');
+const socean = new Socean("mainnet-beta");
 
 const StakeOneLamportWithSoceanButton: FC = () => {
-   const wallet = useWallet();
+  const wallet = useWallet();
 
-   const onClick = async () => {
-      const signatures = await socean.depositSol(
-         wallet,
-         new Numberu64(1),
-      );
-   }
+  const onClick = async () => {
+    const signatures = await socean.depositSol(wallet, new Numberu64(1));
+  };
 
-   return (
-      <button onClick={onClick}>
-         Stake one lamport with Socean
-      </button>
-   );
-}
-
+  return <button onClick={onClick}>Stake one lamport with Socean</button>;
+};
 ```
-
 
 ### Unstake scnSOL and Receive Stake Accounts
 
 Frontend (react example):
 
 ```tsx
-import { Socean, Numberu64 } from '@soceanfi/stake-pool-sdk';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { FC } from 'react';
+import { Socean, Numberu64 } from "@soceanfi/stake-pool-sdk";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { FC } from "react";
 
-const socean = new Socean('mainnet-beta');
+const socean = new Socean("mainnet-beta");
 
 const WithdrawOneDropletFromSoceanButton: FC = () => {
-   const wallet = useWallet();
+  const wallet = useWallet();
 
-   const onClick = async () => {
-      const { transactionSignatures, stakeAccounts } = await socean.withdrawStake(
-         wallet,
-         new Numberu64(1),
-      );
-   }
+  const onClick = async () => {
+    const { transactionSignatures, stakeAccounts } = await socean.withdrawStake(
+      wallet,
+      new Numberu64(1),
+    );
+  };
 
-   return (
-      <button onClick={onClick}>
-         Withdraw one droplet (1 / 10 ** 9 scnSOL) from Socean
-      </button>
-   );
-}
+  return (
+    <button onClick={onClick}>
+      Withdraw one droplet (1 / 10 ** 9 scnSOL) from Socean
+    </button>
+  );
+};
 ```
 
-
 ## Learn more
+
 - [SDK Typedoc](https://stake-pool-sdk.vercel.app/)
 - [Socean stake pool](https://socean.fi)
 - [Socean finance notion](https://soceanfi.notion.site/)

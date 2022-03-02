@@ -30,7 +30,7 @@ export class SoceanConfig {
 
   constructor(
     clusterType: ClusterType,
-    connectionOption: Connection | string | undefined,
+    connectionOption?: Connection | string,
   ) {
     switch (clusterType) {
       case "testnet":
