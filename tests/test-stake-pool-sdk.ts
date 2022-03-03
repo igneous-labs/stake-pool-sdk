@@ -205,7 +205,7 @@ describe("test basic functionalities", () => {
       const depositAmountSol = Math.random() / 4;
       const depositAmount = Math.round(depositAmountSol * LAMPORTS_PER_SOL);
       const depositAmountLamports = new Numberu64(depositAmount);
-      const expectedDroplets = calcSolDeposit(
+      const { dropletsReceived } = calcSolDeposit(
         depositAmountLamports,
         stakePool.account.data,
       );
@@ -221,7 +221,7 @@ describe("test basic functionalities", () => {
 
       scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
       expect(scnSolAtaAcctInfo.amount.toNumber()).to.eq(
-        initialScnSolBalance.add(expectedDroplets).toNumber(),
+        initialScnSolBalance.add(dropletsReceived).toNumber(),
       );
     });
 
