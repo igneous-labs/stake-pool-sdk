@@ -30,7 +30,10 @@ export class SoceanConfig {
 
   connection: Connection;
 
-  constructor(clusterType: ClusterType, rpcEndpoint?: string) {
+  constructor(
+    clusterType: ClusterType,
+    connectionOption?: Connection | string,
+  ) {
     switch (clusterType) {
       case "testnet":
         this.stakePoolAccountPubkey = new PublicKey(TESTNET_STAKEPOOL_ACCOUNT);
@@ -47,6 +50,12 @@ export class SoceanConfig {
       default:
         throw new Error("clusterType must be specified");
     }
-    this.connection = new Connection(rpcEndpoint ?? clusterApiUrl(clusterType));
+    if (connectionOption instanceof Connection) {
+      this.connection = connectionOption;
+    } else {
+      this.connection = new Connection(
+        connectionOption ?? clusterApiUrl(clusterType),
+      );
+    }
   }
 }

@@ -8,6 +8,7 @@
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
   ConfirmOptions,
+  Connection,
   Keypair,
   PublicKey,
   Transaction,
@@ -57,8 +58,16 @@ import {
 export class Socean {
   public readonly config: SoceanConfig;
 
-  constructor(clusterType: ClusterType = "testnet", rpcEndpoint?: string) {
-    this.config = new SoceanConfig(clusterType, rpcEndpoint);
+  /**
+   * Instantiates a Socean client
+   * @param clusterType The cluster, for eg. mainnet-beta, to connect to
+   * @param connectionOption Accepts either a `Connection` or a `rpcEndpoint` string
+   */
+  constructor(
+    clusterType: ClusterType = "testnet",
+    connectionOption?: Connection | string,
+  ) {
+    this.config = new SoceanConfig(clusterType, connectionOption);
   }
 
   /**
