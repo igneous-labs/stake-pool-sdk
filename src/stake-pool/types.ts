@@ -164,3 +164,75 @@ export type ValidatorAllStakeAccounts = {
   main: PublicKey;
   transient: PublicKey;
 };
+
+export type ValidatorStakeAvailableToWithdraw = {
+  /**
+   * Amount of lamports available to withdraw from this validator
+   */
+  lamports: Numberu64;
+  /**
+   * Which stakeAccount to withdraw from - main or transient
+   */
+  stakeAccount: PublicKey;
+};
+
+/**
+ * Breakdown of a single deposit into the stake pool
+ */
+export type DepositReceipt = {
+  /**
+   * Number of lamports that was staked/deposited
+   */
+  lamportsStaked: Numberu64;
+  /**
+   * Number of droplets (1 / 10 ** 9 scnSOL) the user should receive in return
+   * for the deposit, with deposit fees deducted
+   */
+  dropletsReceived: Numberu64;
+  /**
+   * Total number of droplets paid by the user in deposit fees,
+   * including `referralFeePaid`
+   */
+  dropletsFeePaid: Numberu64;
+  /**
+   * Number of droplets paid by the user in referral fees.
+   * This is a part of `dropletsFeePaid`, i.e.
+   * deposit fee paid to socean = `dropletsFeePaid` - `referralFeePaid`
+   */
+  referralFeePaid: Numberu64;
+};
+
+/**
+ * Breakdown of a single withdrawal from a single stake account in the stake pool
+ */
+export type WithdrawalReceipt = {
+  /**
+   * Number of droplets that was unstaked/withdrawn
+   */
+  dropletsUnstaked: Numberu64;
+  /**
+   * Number of lamports the user should receive from the withdrawal,
+   * with withdrawal fees deducted
+   */
+  lamportsReceived: Numberu64;
+  /**
+   * Number of droplets paid by the user in withdrawal fees
+   */
+  dropletsFeePaid: Numberu64;
+};
+
+/**
+ * A withdrawal receipt for a single stake account in the stake pool
+ * + the stakeAccount to make the withdrawal from
+ */
+export type ValidatorWithdrawalReceipt = {
+  /**
+   * The stake account to make this withdrawal from.
+   * Can be a validator stake account, transient stake account, or the pool's reserve stake account.
+   */
+  stakeAccount: PublicKey;
+  /**
+   * The calculated withdrawal receipt for this stake account
+   */
+  withdrawalReceipt: WithdrawalReceipt;
+};
