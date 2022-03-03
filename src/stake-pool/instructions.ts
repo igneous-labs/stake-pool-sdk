@@ -50,7 +50,7 @@ export const depositSolInstruction = (
   referrerPoolTokenAccount: PublicKey,
   poolMint: PublicKey,
   tokenProgramId: PublicKey,
-  amount: number | Numberu64,
+  amount: Numberu64,
   solDepositAuthority?: PublicKey,
 ): TransactionInstruction => {
   const dataLayout = struct<{
