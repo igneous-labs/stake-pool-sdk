@@ -556,6 +556,9 @@ export function calcDropletsReceivedForStakeDeposit(lamportsToStake: Numberu64, 
   return calcDropletsReceivedForDeposit(lamportsToStake, stakePool, stakePool.stakeDepositFee);
 }
 
+/**
+ * Breakdown of a single withdrawal from a single stake account in the stake pool
+ */
 export type WithdrawalReceipt = {
   /**
    * Number of droplets that was unstaked/withdrawn
@@ -572,12 +575,19 @@ export type WithdrawalReceipt = {
   dropletsFeePaid: Numberu64;
 }
 
+/**
+ * A withdrawal receipt for a single stake account in the stake pool
+ * + the stakeAccount to make the withdrawal from
+ */
 export type ValidatorWithdrawalReceipt = {
   /**
    * The stake account to make this withdrawal from.
    * Can be a validator stake account, transient stake account, or the pool's reserve stake account.
    */
   stakeAccount: PublicKey;
+  /**
+   * The calculated withdrawal receipt for this stake account
+   */
   withdrawalReceipt: WithdrawalReceipt;
 }
 

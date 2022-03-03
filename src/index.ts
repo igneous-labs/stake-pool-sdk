@@ -7,5 +7,7 @@ export {
   calcWithdrawals,
   totalWithdrawLamports,
   totalWithdrawalFeesDroplets,
+  WithdrawalReceipt,
+  ValidatorWithdrawalReceipt,
 }  from "./stake-pool/utils"
 export { signAndSendTransactionSequence, TransactionWithSigners, TransactionSequence, TransactionSequenceSignatures, WalletAdapter } from "./transactions";
