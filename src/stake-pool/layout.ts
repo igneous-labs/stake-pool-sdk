@@ -10,13 +10,9 @@ import { blob } from "@solana/buffer-layout";
 /**
  * Layout for a public key
  */
-export const publicKey = (property = "publicKey") => {
-  return blob(32, property);
-};
+export const publicKey = (property = "publicKey") => blob(32, property);
 
 /**
  * Layout for a 64bit unsigned value
  */
-export const uint64 = (property = "uint64") => {
-  return blob(8, property);
-};
+export const uint64 = (property = "uint64") => blob(8, property);

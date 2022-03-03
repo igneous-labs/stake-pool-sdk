@@ -31,19 +31,15 @@
     "sourceMap": true,
     "outDir": "./dist/esm",
     "rootDir": "./src",
-    "types": [
-      "node"
-    ],
-    "lib": [
-      "ES6",
-      "DOM"
-    ]
+    "types": ["node"],
+    "lib": ["ES6", "DOM"],
+    "baseUrl": "./src",
+    "paths": {
+      "@/stake-pool/*": ["stake-pool/*"],
+      "@/socean/*": ["./*"],
+      "@/socean": ["./index.ts"]
+    }
   },
-  "include": [
-    "src/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "tests/**/*.ts"
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "tests/**/*.ts"]
 }

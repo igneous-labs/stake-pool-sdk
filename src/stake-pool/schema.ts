@@ -1,14 +1,16 @@
+/* eslint-disable max-classes-per-file */
 /**
  * Borsh schema for borsh de/serializing stake pool accounts
  *
  * @module
  */
-import { Schema } from "borsh";
+import { Enum, PublicKey, Struct } from "@solana/web3.js";
 import BN from "bn.js";
-import { Struct, Enum, PublicKey } from "@solana/web3.js";
+import { Schema } from "borsh";
 
 export class Fee extends Struct {
   denominator: BN;
+
   numerator: BN;
 }
 
@@ -24,44 +26,76 @@ export enum AccountTypeKind {
 
 export class StakePool extends Struct {
   accountType: AccountType;
+
   manager: PublicKey;
+
   staker: PublicKey;
+
   depositAuthority: PublicKey;
+
   withdrawBumpSeed: number;
+
   validatorList: PublicKey;
+
   reserveStake: PublicKey;
+
   poolMint: PublicKey;
+
   managerFeeAccount: PublicKey;
+
   tokenProgramId: PublicKey;
+
   totalStakeLamports: BN;
+
   poolTokenSupply: BN;
+
   lastUpdateEpoch: BN;
+
   lockup: Lockup;
+
   fee: Fee;
+
   nextEpochFee: Fee;
+
   preferredDepositValidatorVoteAddress: PublicKey;
+
   preferredWithdrawValidatorVoteAddress: PublicKey;
+
   stakeDepositFee: Fee;
+
   withdrawalFee: Fee;
+
   nextWithdrawalFee: Fee;
+
   stakeReferralFee: number;
+
   solDepositAuthority: PublicKey;
+
   solDepositFee: Fee;
+
   solReferralFee: number;
 }
 
 export class ValidatorList extends Struct {
   accountType: AccountType;
+
   maxValidators: number;
+
   validators: [ValidatorStakeInfo];
 }
 export class ValidatorStakeInfo extends Struct {
   activeStakeLamports: BN;
+
   transientStakeLamports: BN;
+
   lastUpdateEpoch: BN;
+
   transientSeedSuffixStart: BN;
+
   transientSeedSuffixEnd: BN;
+
   status: StakeStatus;
+
   voteAccountAddress: PublicKey;
 }
 export class StakeStatus extends Enum {}
@@ -70,7 +104,9 @@ export class StakeStatusEnum extends Struct {}
 
 export class Lockup extends Struct {
   unixtime: BN;
+
   epoch: BN;
+
   custodian: PublicKey;
 }
 

@@ -4,52 +4,60 @@
  * @module
  */
 import {
-  AccountInfo,
-  PublicKey,
-  Transaction,
-  SOLANA_SCHEMA,
-  Connection,
-  Keypair,
-  SystemProgram,
-  StakeProgram,
-  Signer,
-} from "@solana/web3.js";
-import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   Token,
   TOKEN_PROGRAM_ID,
-  ASSOCIATED_TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
-
-import BN from 'bn.js';
-
 import {
-  StakePoolAccount,
-  STAKE_STATE_LEN,
-  ValidatorListAccount,
+  AccountInfo,
+  Connection,
+  Keypair,
+  PublicKey,
+  Signer,
+  SOLANA_SCHEMA,
+  StakeProgram,
+  SystemProgram,
+  Transaction,
+} from "@solana/web3.js";
+import BN from "bn.js";
+
+import { RpcError, WithdrawalUnserviceableError } from "@/socean/err";
+import { TransactionWithSigners } from "@/socean/transactions";
+import { withdrawStakeInstruction } from "@/stake-pool/instructions";
+import * as schema from "@/stake-pool/schema";
+import {
+  addStakePoolSchema,
+  ValidatorList,
+  ValidatorStakeInfo,
+} from "@/stake-pool/schema";
+import {
   Numberu64,
-} from './types';
-import { withdrawStakeInstruction } from "./instructions";
-import * as schema from "./schema";
-import { addStakePoolSchema, ValidatorStakeInfo, ValidatorList } from "./schema";
-import { RpcError, WithdrawalUnserviceableError } from "../err";
-import { TransactionWithSigners } from "../transactions";
+  STAKE_STATE_LEN,
+  StakePoolAccount,
+  ValidatorListAccount,
+} from "@/stake-pool/types";
+
 addStakePoolSchema(SOLANA_SCHEMA);
 
 export function reverse(object: any) {
+  // TODO: fix this to make eslint happy
+  // eslint-disable-next-line no-restricted-syntax
   for (const val in object) {
     if (object[val] instanceof PublicKey) {
       object[val] = new PublicKey(object[val].toBytes().reverse());
-      //console.log(val, object[val].toString());
+      // console.log(val, object[val].toString());
     } else if (object[val] instanceof Object) {
       reverse(object[val]);
     } else if (object[val] instanceof Array) {
+      // TODO: fix this to make eslint happy
+      // eslint-disable-next-line no-restricted-syntax
       for (const elem of object[val]) {
         reverse(elem);
       }
     }
-    /*else {
+    /* else {
       console.log(val, object[val]);
-    }*/
+    } */
   }
 }
 
@@ -103,16 +111,18 @@ export function getValidatorListFromAccountInfo(
   };
 }
 
-export const calcPoolPriceAndFee = (stakePool: StakePoolAccount): [number, number] => {
+export const calcPoolPriceAndFee = (
+  stakePool: StakePoolAccount,
+): [number, number] => {
   const stakePoolData = stakePool.account.data;
   const lamports = stakePoolData.totalStakeLamports.toNumber();
   const poolTokens = stakePoolData.poolTokenSupply.toNumber();
-  const price = lamports == 0 || poolTokens == 0 ? 1 : lamports / poolTokens;
-  const feeNum = stakePoolData.withdrawalFee.numerator.toNumber()
+  const price = lamports === 0 || poolTokens === 0 ? 1 : lamports / poolTokens;
+  const feeNum = stakePoolData.withdrawalFee.numerator.toNumber();
   const feeDenom = stakePoolData.withdrawalFee.denominator.toNumber();
   const withdrawalFee = feeNum / feeDenom;
   return [price, withdrawalFee];
-}
+};
 
 /**
  * Algorithm to select which validators to withdraw from and how much from each
@@ -142,7 +152,7 @@ export async function validatorsToWithdrawFrom(
 ): Promise<[PublicKey, number][]> {
   // For now just pick the validator with the largest stake
   // NOTE: this means we cannot service withdrawls larger than that right now
-  const validators = validatorList.validators;
+  const { validators } = validatorList;
   // no active validators, withdraw from reserve
   // also, reduce() throws error if array empty
   if (validators.length < 1) return [[reserve, withdrawalAmountDroplets]];
@@ -179,9 +189,11 @@ export function sortedValidatorStakeInfos(
     validatorA: ValidatorStakeInfo,
     validatorB: ValidatorStakeInfo,
   ): number {
+    // eslint-disable-next-line no-nested-ternary
     return validatorA.activeStakeLamports.gt(validatorB.activeStakeLamports)
       ? -1
-      : validatorA.activeStakeLamports.lt(validatorB.activeStakeLamports)
+      : // eslint-disable-next-line no-nested-ternary
+      validatorA.activeStakeLamports.lt(validatorB.activeStakeLamports)
       ? 1
       : validatorA.transientStakeLamports.gt(validatorB.transientStakeLamports)
       ? -1
@@ -200,8 +212,6 @@ export function validatorTotalStake(validator: ValidatorStakeInfo): BN {
   return validator.activeStakeLamports.add(validator.transientStakeLamports);
 }
 
-
-
 /**
  * Gets the address of the stake pool's stake account for the given validator
  * @param stakePoolProgramId public key of the stake pool program
@@ -213,7 +223,10 @@ export async function getValidatorStakeAccount(
   stakePoolPubkey: PublicKey,
   validatorVoteAccount: PublicKey,
 ): Promise<PublicKey> {
-  const [key, _bump_seed] = await PublicKey.findProgramAddress(
+  const [
+    key,
+    // _bump_seed
+  ] = await PublicKey.findProgramAddress(
     [validatorVoteAccount.toBuffer(), stakePoolPubkey.toBuffer()],
     stakePoolProgramId,
   );
@@ -231,7 +244,10 @@ export async function getValidatorTransientStakeAccount(
   stakePoolPubkey: PublicKey,
   validatorVoteAccount: PublicKey,
 ): Promise<PublicKey> {
-  const [key, _bump_seed] = await PublicKey.findProgramAddress(
+  const [
+    key,
+    // _bump_seed
+  ] = await PublicKey.findProgramAddress(
     [
       Buffer.from("transient"),
       validatorVoteAccount.toBuffer(),
@@ -242,15 +258,17 @@ export async function getValidatorTransientStakeAccount(
   return key;
 }
 
-export async function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKey): Promise<PublicKey> {
-  return await Token.getAssociatedTokenAddress(
+export async function getAssociatedTokenAddress(
+  mint: PublicKey,
+  owner: PublicKey,
+): Promise<PublicKey> {
+  return Token.getAssociatedTokenAddress(
     ASSOCIATED_TOKEN_PROGRAM_ID,
     TOKEN_PROGRAM_ID,
     mint,
     owner,
   );
 }
-
 
 /**
  * Creates withdrawStake transactions
@@ -291,12 +309,13 @@ export async function getWithdrawStakeTransactions(
   );
 
   const lamportsReqStakeAcc =
-    await connection.getMinimumBalanceForRentExemption(
-      STAKE_STATE_LEN,
-    );
+    await connection.getMinimumBalanceForRentExemption(STAKE_STATE_LEN);
 
   // since user is withdrawing, pool token acc should exist
-  const userPoolTokenAccount = await getAssociatedTokenAddress(stakePoolData.poolMint, walletPubkey);
+  const userPoolTokenAccount = await getAssociatedTokenAddress(
+    stakePoolData.poolMint,
+    walletPubkey,
+  );
 
   const newStakeAccounts: Keypair[] = [];
   const transactions: TransactionWithSigners[] = [];
@@ -365,9 +384,7 @@ export async function getWithdrawStakeTransactions(
  * @returns result of the rpc call
  * @throws RpcError
  */
-export async function tryRpc<T>(
-  fallibleRpcCall: Promise<T>,
-): Promise<T> {
+export async function tryRpc<T>(fallibleRpcCall: Promise<T>): Promise<T> {
   try {
     const res = await fallibleRpcCall;
     return res;
@@ -400,9 +417,7 @@ export async function getOrCreateAssociatedAddress(
   // This is the optimum logic, considering TX fee, client-side computation,
   // RPC roundtrips and guaranteed idempotent.
   // Sadly we can't do this atomically;
-  const info = await tryRpc(connection.getAccountInfo(
-    associatedAddress,
-  ));
+  const info = await tryRpc(connection.getAccountInfo(associatedAddress));
   // possible for account owner to not be token program if the associatedAddress has
   // already been received some lamports (= became system accounts).
   // Assuming program derived addressing is safe, this is the only case for that
@@ -430,7 +445,10 @@ export async function getWithdrawAuthority(
   stakePoolProgramId: PublicKey,
   stakePoolPubkey: PublicKey,
 ): Promise<PublicKey> {
-  const [key, _bump_seed] = await PublicKey.findProgramAddress(
+  const [
+    key,
+    // _bump_seed
+  ] = await PublicKey.findProgramAddress(
     [stakePoolPubkey.toBuffer(), Buffer.from("withdraw")],
     stakePoolProgramId,
   );
@@ -446,7 +464,10 @@ export async function getDefaultDepositAuthority(
   stakePoolProgramId: PublicKey,
   stakePoolPubkey: PublicKey,
 ): Promise<PublicKey> {
-  const [key, _bump_seed] = await PublicKey.findProgramAddress(
+  const [
+    key,
+    // _bump_seed
+  ] = await PublicKey.findProgramAddress(
     [stakePoolPubkey.toBuffer(), Buffer.from("deposit")],
     stakePoolProgramId,
   );
@@ -455,14 +476,22 @@ export async function getDefaultDepositAuthority(
 
 /**
  * Helper function for calculating expected droplets given a deposit and the deposit fee struct
- * @param lamportsToStake 
- * @param stakePool 
+ * @param lamportsToStake
+ * @param stakePool
  * @param depositFee the Fee struct for the given deposit type,
  *                   should either be stakePool.solDepositFee or stakePool.stakeDepositFee
  * @returns expected droplets given in return for staking `lamportsToStake`, with deposit fees factored in
  */
-export function calcDropletsReceivedForDeposit(lamportsToStake: Numberu64, stakePool: schema.StakePool, depositFee: schema.Fee): Numberu64 {
-  const dropletsMinted = lamportsToStake.mul(stakePool.poolTokenSupply).div(stakePool.totalStakeLamports);
-  const depositFeeDroplets = depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator);
+export function calcDropletsReceivedForDeposit(
+  lamportsToStake: Numberu64,
+  stakePool: schema.StakePool,
+  depositFee: schema.Fee,
+): Numberu64 {
+  const dropletsMinted = lamportsToStake
+    .mul(stakePool.poolTokenSupply)
+    .div(stakePool.totalStakeLamports);
+  const depositFeeDroplets = depositFee.numerator
+    .mul(dropletsMinted)
+    .div(depositFee.denominator);
   return dropletsMinted.sub(depositFeeDroplets);
 }

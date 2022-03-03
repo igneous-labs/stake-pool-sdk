@@ -1,6 +1,14 @@
-import { ConfirmOptions, Connection, PublicKey, sendAndConfirmRawTransaction, Signer, Transaction } from "@solana/web3.js";
-import { WalletPublicKeyUnavailableError } from "./err";
-import { tryRpc } from "./stake-pool/utils";
+import {
+  ConfirmOptions,
+  Connection,
+  PublicKey,
+  sendAndConfirmRawTransaction,
+  Signer,
+  Transaction,
+} from "@solana/web3.js";
+
+import { WalletPublicKeyUnavailableError } from "@/socean/err";
+import { tryRpc } from "@/stake-pool/utils";
 
 export interface TransactionWithSigners {
   tx: Transaction;
@@ -14,6 +22,8 @@ export interface TransactionWithSigners {
  */
 function partialSign(transaction: TransactionWithSigners): Transaction {
   const { tx, signers } = transaction;
+  // TODO: fix this to make eslint happy
+  // eslint-disable-next-line no-restricted-syntax
   for (const signer of signers) {
     tx.partialSign(signer);
   }
@@ -53,7 +63,7 @@ export type TransactionSequenceSignatures = Array<string[]>;
 export const TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS: ConfirmOptions = {
   preflightCommitment: "processed",
   commitment: "confirmed",
-}
+};
 
 /**
  * Signs and sends `TransactionSequence`,
@@ -77,6 +87,8 @@ export async function signAndSendTransactionSequence(
   const feePayer = walletAdapter.publicKey;
   if (!feePayer) throw new WalletPublicKeyUnavailableError();
 
+  // TODO: fix this to make eslint happy
+  // eslint-disable-next-line no-restricted-syntax
   for (const transactionArray of transactionSequence) {
     const signatures = await signSendConfirmTransactions(
       walletAdapter,
@@ -117,11 +129,14 @@ async function signSendConfirmTransactions(
     return partialSign(transaction);
   });
 
-  const signedTransactions = await walletAdapter.signAllTransactions(partialSignedTransactions);
+  const signedTransactions = await walletAdapter.signAllTransactions(
+    partialSignedTransactions,
+  );
 
-  const sigPromises = signedTransactions.map((tx) => tryRpc(
-      sendAndConfirmRawTransaction(connection, tx.serialize(), confirmOptions)
-    )
+  const sigPromises = signedTransactions.map((tx) =>
+    tryRpc(
+      sendAndConfirmRawTransaction(connection, tx.serialize(), confirmOptions),
+    ),
   );
 
   return Promise.all(sigPromises);

@@ -5,25 +5,23 @@
  */
 
 import { struct, u8, u32 } from "@solana/buffer-layout";
-
 import {
   PublicKey,
+  StakeProgram,
   SystemProgram,
   SYSVAR_CLOCK_PUBKEY,
-  TransactionInstruction,
-  StakeProgram,
-  Transaction,
-  SYSVAR_STAKE_HISTORY_PUBKEY,
   SYSVAR_INSTRUCTIONS_PUBKEY,
+  SYSVAR_STAKE_HISTORY_PUBKEY,
+  Transaction,
+  TransactionInstruction,
 } from "@solana/web3.js";
 
-import * as Layout from "./layout";
+import * as Layout from "@/stake-pool/layout";
 import {
   Numberu64,
   StakePoolInstruction,
   ValidatorAllStakeAccounts,
-} from "./types";
-
+} from "@/stake-pool/types";
 /**
  * Initializes a DepositSol stake pool instruction given the required accounts and data
  *
@@ -216,7 +214,7 @@ export function updateValidatorListBalanceTransaction(
   dataLayout.encode(
     {
       instruction: StakePoolInstruction.UpdateValidatorListBalance,
-      startIndex: startIndex,
+      startIndex,
       noMerge: noMerge ? 1 : 0,
     },
     data,
@@ -233,6 +231,8 @@ export function updateValidatorListBalanceTransaction(
     { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
   ];
 
+  // TODO: fix this to make eslint happy
+  // eslint-disable-next-line no-restricted-syntax
   for (const vsa of validatorStakeAccounts) {
     const { main, transient } = vsa;
     keys.push({

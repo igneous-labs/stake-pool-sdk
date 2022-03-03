@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file */
 /**
  * Custom error definitions and helpers
  *
@@ -18,11 +19,9 @@ export class RpcError extends Error {
  * Given account does not exist
  */
 export class AccountDoesNotExistError extends Error {
-  readonly account: PublicKey
+  readonly account: PublicKey;
 
-  constructor(
-    account: PublicKey,
-  ) {
+  constructor(account: PublicKey) {
     super(`Account ${account.toString()} does not exist`);
     this.account = account;
   }
@@ -46,10 +45,10 @@ export class WalletPublicKeyUnavailableError extends Error {
   }
 }
 
-///**
+/// **
 // * Error class reprensenting a partially-filled withdraw-stake operation
 // */
-//export class PartialWithdrawalError extends Error {
+// export class PartialWithdrawalError extends Error {
 //  completedTransactions: TransactionSignature[];
 //  newStakeAccounts: Keypair[];
 //
@@ -62,4 +61,4 @@ export class WalletPublicKeyUnavailableError extends Error {
 //    this.completedTransactions = completedTransactions;
 //    this.newStakeAccounts = newStakeAccounts;
 //  }
-//}
+// }
