@@ -20,8 +20,6 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 
-import BN from 'bn.js';
-
 import {
   StakePoolAccount,
   STAKE_STATE_LEN,
@@ -103,101 +101,192 @@ export function getValidatorListFromAccountInfo(
   };
 }
 
-export const calcPoolPriceAndFee = (stakePool: StakePoolAccount): [number, number] => {
-  const stakePoolData = stakePool.account.data;
-  const lamports = stakePoolData.totalStakeLamports.toNumber();
-  const poolTokens = stakePoolData.poolTokenSupply.toNumber();
-  const price = lamports == 0 || poolTokens == 0 ? 1 : lamports / poolTokens;
-  const feeNum = stakePoolData.withdrawalFee.numerator.toNumber()
-  const feeDenom = stakePoolData.withdrawalFee.denominator.toNumber();
-  const withdrawalFee = feeNum / feeDenom;
-  return [price, withdrawalFee];
+/**
+ * Attempt to service part of a withdrawal with some amount of lamports available to withdraw
+ * @param withdrawalAmountDroplets amount to withdraw in droplets.
+ *                                 The returned `WithdrawalReceipt` should aim to service
+ *                                 part of or all of this amount.
+ * @param lamportsAvailable lamports available to service this withdrawal
+ * @param stakePool
+ * @returns the WithdrawalReceipt serviced by `lamportsAvailable`.
+ *          `dropletsUnstaked` and/or `lamportsReceived` may be zero
+ * @throws WithdrawalUnserviceableError if calculation error occurs
+ */
+function tryServiceWithdrawal(
+  withdrawalAmountDroplets: Numberu64,
+  lamportsAvailable: Numberu64,
+  stakePool: schema.StakePool
+): WithdrawalReceipt {
+  const dropletsServiceable = estDropletsUnstakedByWithdrawal(lamportsAvailable, stakePool);
+  const dropletsServiced = withdrawalAmountDroplets.lt(dropletsServiceable)
+    ? withdrawalAmountDroplets
+    : dropletsServiceable;
+  const withdrawalReceipt = calcWithdrawalReceipt(
+    dropletsServiced,
+    stakePool
+  );
+  // check that the withdrawal is indeed serviceable
+  if (withdrawalReceipt.lamportsReceived.gt(lamportsAvailable)) {
+    // rounding error happened somewhere
+    throw new WithdrawalUnserviceableError(
+      `Stake account only has ${lamportsAvailable.toNumber()} lamports`
+      + `, not enough to service ${withdrawalReceipt.lamportsReceived.toNumber()} lamports required for withdrawal`
+    );
+  }
+  return withdrawalReceipt;
 }
 
 /**
- * Algorithm to select which validators to withdraw from and how much from each
+ * Calculates the withdrawal procedure - how many lamports to split and withdraw from each validator stake account
+ * given a desired number of droplets to withdraw.
  *
- * @param stakePoolProgramId program id of the stake pool program
- * @param stakePoolPubkey public key of the stake pool account
- * @param withdrawalAmountDroplets: amount to withdraw in droplets
- * @param withdrawalAmountLamports: total amount to deduct from all involved validator stake accounts in lamports
+ * @param withdrawalAmountDroplets: amount to withdraw in droplets (1 / 10 ** 9 scnSOL)
+ * @param stakePoolAccount the stake pool account
  * @param validatorList: ValidatorList account data
- * @param reserve: Pubkey of the stake pool's reserve account
  *
- * @returns: array of [PublicKey, number] tuples, where
- *           [0] - pubkey of validator's stake account. Note: NOT vote account
- *           [1] - amount in SOCN to withdraw from that validator. Sum of all these must = withdrawalAmount
- *           Pass this array directly to StakePoolClient.withdrawStake()
+ * @returns: Array of `ValidatorWithdrawalReceipt`, where
+ *           Sum of all their `dropletsUnstaked` must = withdrawalAmountDroplets
+ *           Pass this array directly to `getWithdrawStakeTransactions()`
  *
- *           Returns [[reserveAccPubkey, withdrawalAmountSocn]] if withdrawing from reserve account
+ *           Returns array with single elem if withdrawing from reserve account
  * @throws WithdrawalUnserviceableError if a suitable withdraw procedure is not found
  */
-export async function validatorsToWithdrawFrom(
-  stakePoolProgramId: PublicKey,
-  stakePoolPubkey: PublicKey,
-  withdrawalAmountDroplets: number,
-  withdrawalAmountLamports: number,
+export async function calcWithdrawals(
+  withdrawalAmountDroplets: Numberu64,
+  stakePoolAccount: StakePoolAccount,
   validatorList: ValidatorList,
-  reserve: PublicKey,
-): Promise<[PublicKey, number][]> {
-  // For now just pick the validator with the largest stake
-  // NOTE: this means we cannot service withdrawls larger than that right now
+): Promise<ValidatorWithdrawalReceipt[]> {
+  const { publicKey: stakePoolPubkey, account: { data: stakePool, owner: stakePoolProgramId } } = stakePoolAccount;
   const validators = validatorList.validators;
   // no active validators, withdraw from reserve
   // also, reduce() throws error if array empty
-  if (validators.length < 1) return [[reserve, withdrawalAmountDroplets]];
+  if (validators.length < 1) return [{
+    stakeAccount: stakePool.reserveStake,
+    withdrawalReceipt: calcWithdrawalReceipt(
+      withdrawalAmountDroplets,
+      stakePool,
+    ),
+  }];
 
-  const sortedValidators = sortedValidatorStakeInfos(validators);
-  const heaviest = sortedValidators[0];
 
-  const available = stakeAvailableToWithdraw(heaviest);
-  if (available.eq(new BN(0))) {
-    return [[reserve, withdrawalAmountDroplets]];
+  const sortedValidators = validatorsByTotalStakeAsc(validators);
+  const validatorStakeAvailableToWithdraw = await Promise.all(sortedValidators.map(
+    (validator) => stakeAvailableToWithdraw(validator, stakePoolProgramId, stakePoolPubkey)
+  ));
+  const res: ValidatorWithdrawalReceipt[] = [];
+  
+  let dropletsRemaining = withdrawalAmountDroplets;
+
+  // Withdraw from the lightest validators first
+  for (const { lamports, stakeAccount } of validatorStakeAvailableToWithdraw) {
+    if (dropletsRemaining.isZero()) {
+      break;
+    }
+    const withdrawalReceipt = tryServiceWithdrawal(
+      dropletsRemaining,
+      lamports,
+      stakePool
+    );
+    if (!withdrawalReceipt.dropletsUnstaked.isZero() && !withdrawalReceipt.lamportsReceived.isZero()) {
+      res.push({
+        stakeAccount,
+        withdrawalReceipt,
+      });
+      dropletsRemaining = dropletsRemaining.satSub(withdrawalReceipt.dropletsUnstaked);
+    }
   }
-  if (available.lt(new BN(withdrawalAmountLamports))) {
-    throw new WithdrawalUnserviceableError();
+
+  // might happen if many transient stake accounts
+  if (!dropletsRemaining.isZero()) {
+    // cannot proceed directly to transient stake accounts
+    // even if main stake account is deleted because of
+    // MIN_ACTIVE_LAMPORTS
+    // cannot proceed directly to the reserves
+    // unless absolutely all stake accounts (main and transient) are deleted
+    // and you can only delete a main stake account with RemoveValidator instruction
+    throw new WithdrawalUnserviceableError(
+      "Too many transient stake accounts, please try again with a smaller withdraw amount or on the next epoch"
+    );
   }
-  const isTransient = heaviest.activeStakeLamports.eq(new BN(0));
-  const stakeAcc = await (isTransient
-    ? getValidatorTransientStakeAccount(
-        stakePoolProgramId,
-        stakePoolPubkey,
-        heaviest.voteAccountAddress,
-      )
-    : getValidatorStakeAccount(
-        stakePoolProgramId,
-        stakePoolPubkey,
-        heaviest.voteAccountAddress,
-      ));
-  return [[stakeAcc, withdrawalAmountDroplets]];
+  
+  return res;
 }
 
-export function sortedValidatorStakeInfos(
+function validatorsByTotalStakeAsc(
   validatorStakeInfos: ValidatorStakeInfo[],
 ): ValidatorStakeInfo[] {
-  function compareValidatorStake(
-    validatorA: ValidatorStakeInfo,
-    validatorB: ValidatorStakeInfo,
-  ): number {
-    return validatorA.activeStakeLamports.gt(validatorB.activeStakeLamports)
-      ? -1
-      : validatorA.activeStakeLamports.lt(validatorB.activeStakeLamports)
-      ? 1
-      : validatorA.transientStakeLamports.gt(validatorB.transientStakeLamports)
-      ? -1
-      : 1;
-  }
-  return [...validatorStakeInfos].sort(compareValidatorStake);
+  return [...validatorStakeInfos].sort((
+      validatorA,
+      validatorB,
+    ) => {
+      const a = validatorTotalStake(validatorA);
+      const b = validatorTotalStake(validatorB);
+      // Numberu64 is unsigned, cannot subtract directly
+      return a.eq(b) ? 0 : a.lt(b) ? -1 : 1;
+    }
+  );
 }
 
-export function stakeAvailableToWithdraw(validator: ValidatorStakeInfo): BN {
-  return validator.activeStakeLamports.gt(new BN(0))
-    ? validator.activeStakeLamports
-    : validator.transientStakeLamports;
+
+// A validator stake account needs this amount of active staked lamports
+// for the staker to be able to remove the validator from the stake pool.
+const MIN_ACTIVE_STAKE_LAMPORTS = new Numberu64(1_000_000); // 0.001 SOL
+
+// TODO: this might change in the future if rent costs change
+// but since this is a const in the on-chain prog too, fuck it
+const STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS = new Numberu64(2_282_880);
+
+type ValidatorStakeAvailableToWithdraw = {
+  lamports: Numberu64;
+  stakeAccount: PublicKey;
 }
 
-export function validatorTotalStake(validator: ValidatorStakeInfo): BN {
-  return validator.activeStakeLamports.add(validator.transientStakeLamports);
+/**
+ * Gets the stake available to withdraw from a validator.
+ * This is `activeStakeLamports` if there is an active stake account
+ * or `transientStakeLamports` if there is none.
+ * Also returns the pubkey of their stake account to withdraw from (either the active or transient stake account)
+ * @param validator `ValidatorStakeInfo` for the validator
+ * @param stakePoolProgramId
+ * @param stakePoolPubkey
+ * @returns 
+ * - lamports available for withdrawal
+ * - pubkey of the stake account to withdraw from
+ */
+async function stakeAvailableToWithdraw(
+  validator: ValidatorStakeInfo,
+  stakePoolProgramId: PublicKey,
+  stakePoolPubkey: PublicKey
+): Promise<ValidatorStakeAvailableToWithdraw> {
+  // must withdraw from active stake account if active stake account has non-zero balance
+  const hasActive = !validator.activeStakeLamports.isZero(); // false if validator is newly added
+  const hasTransient = !validator.transientStakeLamports.isZero();
+  // this is fucking stupid but 
+  // `transientStakeLamports` = rent exempt reserve + delegation.stake, whereas
+  // `activeStakeLamports` = delegation.stake - MIN_ACTIVE_STAKE_LAMPORTS.
+  // You're only allowed to withdraw delegation.stake - MIN_ACTIVE_STAKE_LAMPORTS lamports.
+  // I've forgotten WHY THE FUCK these 2 values are semantically different in the on-chain prog,
+  // probably to make the merge transient stake to active stake calculation easier
+  const activeWithdrawableLamports = Numberu64.cloneFromBN(validator.activeStakeLamports);
+  const transientUnwithdrawableLamports = STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS.add(MIN_ACTIVE_STAKE_LAMPORTS);
+  const transientWithdrawableLamports = Numberu64.cloneFromBN(validator.transientStakeLamports).satSub(transientUnwithdrawableLamports);
+  const transientStakeAccount = await getValidatorTransientStakeAccount(
+    stakePoolProgramId,
+    stakePoolPubkey,
+    validator.voteAccountAddress,
+  );
+  const [lamports, stakeAccount] = hasActive
+      ? [activeWithdrawableLamports, await getValidatorStakeAccount(
+          stakePoolProgramId,
+          stakePoolPubkey,
+          validator.voteAccountAddress,
+        )]
+      : [transientWithdrawableLamports, transientStakeAccount];
+  return { lamports, stakeAccount };
+}
+
+function validatorTotalStake(validator: ValidatorStakeInfo): Numberu64 {
+  return Numberu64.cloneFromBN(validator.activeStakeLamports.add(validator.transientStakeLamports));
 }
 
 
@@ -264,9 +353,8 @@ export async function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKe
  * @param stakePoolProgramId program id of the stake pool program
  * @param stakePool stake pool account
  * @param validatorList validator list account
- * @param amounts: list of [Pubkey, number] tuples, where each tuple is
- *                 [0]: Stake pool validator stake account
- *                 [1]: amount of pool tokens to withdraw from that account
+ * @param validatorWithdrawalReceipts: list of `ValidatorWithdrawalReceipt`s generated by
+ *                                     `calcWithdrawals()`
  *
  * @returns [Transaction[], Keypair[]] tuple, where
  *          [0]: list of transactions for withdraw instruction
@@ -279,7 +367,7 @@ export async function getWithdrawStakeTransactions(
   stakePoolProgramId: PublicKey,
   stakePool: StakePoolAccount,
   validatorList: ValidatorListAccount,
-  amounts: [PublicKey, number | Numberu64][],
+  validatorWithdrawalReceipts: ValidatorWithdrawalReceipt[],
 ): Promise<[TransactionWithSigners[], Keypair[]]> {
   // TODO: confirm this number
   const MAX_WITHDRAWALS_PER_TX = 4;
@@ -303,7 +391,7 @@ export async function getWithdrawStakeTransactions(
 
   for (
     let chunkOffset = 0;
-    chunkOffset < amounts.length;
+    chunkOffset < validatorWithdrawalReceipts.length;
     chunkOffset += MAX_WITHDRAWALS_PER_TX
   ) {
     const tx = new Transaction();
@@ -312,10 +400,15 @@ export async function getWithdrawStakeTransactions(
     // Add WithdrawStake Instruction for each validator in the chunk
     for (
       let i = chunkOffset;
-      i < amounts.length && i < chunkOffset + MAX_WITHDRAWALS_PER_TX;
+      i < validatorWithdrawalReceipts.length && i < chunkOffset + MAX_WITHDRAWALS_PER_TX;
       i++
     ) {
-      const [stakeSplitFrom, amount] = amounts[i];
+      const {
+        stakeAccount: stakeSplitFrom,
+        withdrawalReceipt: {
+          dropletsUnstaked,
+        }
+      } = validatorWithdrawalReceipts[i];
       // create blank stake account
       const stakeSplitTo = Keypair.generate();
       newStakeAccounts.push(stakeSplitTo);
@@ -345,7 +438,7 @@ export async function getWithdrawStakeTransactions(
           stakePoolData.managerFeeAccount,
           stakePoolData.poolMint,
           TOKEN_PROGRAM_ID,
-          amount,
+          dropletsUnstaked,
         ),
       );
     }
@@ -381,7 +474,7 @@ export async function tryRpc<T>(
 }
 
 /**
- * get associated token address and adds instruciton to create one to `tx` if not exist
+ * get associated token address and adds instruction to create one to `tx` if not exist
  * @param connection active connection
  * @param mint mint address of the token account
  * @param owner pubkey of the owner of the associated account
@@ -454,15 +547,165 @@ export async function getDefaultDepositAuthority(
 }
 
 /**
- * Helper function for calculating expected droplets given a deposit and the deposit fee struct
+ * Helper function for calculating expected droplets given a deposit and the deposit fee struct.
+ * Mirrors on-chain math exactly.
  * @param lamportsToStake 
  * @param stakePool 
  * @param depositFee the Fee struct for the given deposit type,
  *                   should either be stakePool.solDepositFee or stakePool.stakeDepositFee
  * @returns expected droplets given in return for staking `lamportsToStake`, with deposit fees factored in
  */
-export function calcDropletsReceivedForDeposit(lamportsToStake: Numberu64, stakePool: schema.StakePool, depositFee: schema.Fee): Numberu64 {
+function calcDropletsReceivedForDeposit(lamportsToStake: Numberu64, stakePool: schema.StakePool, depositFee: schema.Fee): Numberu64 {
   const dropletsMinted = lamportsToStake.mul(stakePool.poolTokenSupply).div(stakePool.totalStakeLamports);
-  const depositFeeDroplets = depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator);
-  return dropletsMinted.sub(depositFeeDroplets);
+  const hasFee = !depositFee.numerator.isZero() && !depositFee.denominator.isZero();
+  const depositFeeDroplets = hasFee ? depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator) : new Numberu64(0);
+  // overflow safety: depositFee < 1.0
+  return Numberu64.cloneFromBN(dropletsMinted.sub(depositFeeDroplets));
+}
+
+/**
+ * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
+ * by the user for staking SOL, with deposit fees factored in.
+ * Note: if an epoch boundary crosses and the stake pool is updated, the scnSOL supply
+ * will no longer match and the result of this function will be incorrect
+ * @param lamportsToStake amount of SOL to be staked, in lamports
+ * @param stakePool the stake pool to stake to
+ * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
+ */
+export function calcDropletsReceivedForSolDeposit(lamportsToStake: Numberu64, stakePool: schema.StakePool): Numberu64 {
+  return calcDropletsReceivedForDeposit(lamportsToStake, stakePool, stakePool.solDepositFee);
+}
+
+/**
+ * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
+ * by the user for staking stake account(s), with deposit fees factored in.
+ * Note: if an epoch boundary crosses and the stake pool is updated, the scnSOL supply
+ * will no longer match and the result of this function will be incorrect
+ * @param lamportsToStake SOL value of the stake accounts to be staked, in lamports
+ * @param stakePool the stake pool to stake to
+ * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
+ */
+export function calcDropletsReceivedForStakeDeposit(lamportsToStake: Numberu64, stakePool: schema.StakePool): Numberu64 {
+  return calcDropletsReceivedForDeposit(lamportsToStake, stakePool, stakePool.stakeDepositFee);
+}
+
+/**
+ * Breakdown of a single withdrawal from a single stake account in the stake pool
+ */
+export type WithdrawalReceipt = {
+  /**
+   * Number of droplets that was unstaked/withdrawn
+   */
+  dropletsUnstaked: Numberu64;
+  /**
+   * Number of lamports the user should receive from the withdrawal,
+   * with withdrawal fees deducted
+   */
+  lamportsReceived: Numberu64;
+  /**
+   * Number of droplets paid by the user in withdrawal fees
+   */
+  dropletsFeePaid: Numberu64;
+}
+
+/**
+ * A withdrawal receipt for a single stake account in the stake pool
+ * + the stakeAccount to make the withdrawal from
+ */
+export type ValidatorWithdrawalReceipt = {
+  /**
+   * The stake account to make this withdrawal from.
+   * Can be a validator stake account, transient stake account, or the pool's reserve stake account.
+   */
+  stakeAccount: PublicKey;
+  /**
+   * The calculated withdrawal receipt for this stake account
+   */
+  withdrawalReceipt: WithdrawalReceipt;
+}
+
+/**
+ * Helper function for calculating expected lamports given the amount of droplets to withdraw.
+ * Mirrors on-chain math exactly.
+ * Due to loss of precision from int arithmetic, this function should be ran per validator instead of
+ * on an entire withdrawal amount.
+ * @param dropletsToWithdraw
+ * @param stakePool 
+ * @returns expected lamports given in return for unstaking `dropletsToUnstake`, with withdrawal fees factored in,
+ *          and the withdrawal fees charged
+ * @throws 
+ */
+function calcWithdrawalReceipt(dropletsToUnstake: Numberu64, stakePool: schema.StakePool): WithdrawalReceipt {
+  const { withdrawalFee, totalStakeLamports, poolTokenSupply } = stakePool;
+  // on-chain logic: the withdrawal fee is levied first
+  const hasFee = !withdrawalFee.numerator.isZero() && !withdrawalFee.denominator.isZero();
+  const dropletsFeePaid = hasFee ? Numberu64.cloneFromBN(withdrawalFee.numerator.mul(dropletsToUnstake).div(withdrawalFee.denominator)) : new Numberu64(0);
+  // overflow safety: withdrawalFee < 1.0
+  const dropletsBurnt = dropletsToUnstake.sub(dropletsFeePaid);
+  const num = dropletsBurnt.mul(totalStakeLamports);
+  if (num.lt(poolTokenSupply) || poolTokenSupply.isZero()) {
+    return {
+      dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
+      lamportsReceived: new Numberu64(0),
+      dropletsFeePaid,
+    };
+  }
+  // on-chain logic is ceil div
+  // overflow safety: 1 < num + poolTokenSupply
+  const lamportsReceived = Numberu64.cloneFromBN(num.add(poolTokenSupply).sub(new Numberu64(1)).div(poolTokenSupply));
+  return {
+    dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
+    lamportsReceived,
+    dropletsFeePaid,
+  };
+}
+
+/**
+ * Helper function for estimating number of droplets that were unstaked
+ * given the output lamports withdrawn, with fees accounted for.
+ * The inverse of `calcWithdrawal`.
+ * Not exact due to int division.
+ * @returns estimated number of droplets that was usntaked
+ */
+function estDropletsUnstakedByWithdrawal(lamportsReceived: Numberu64, stakePool: schema.StakePool): Numberu64 {
+  const { withdrawalFee, totalStakeLamports, poolTokenSupply } = stakePool;
+  const estDropletsBurnt = lamportsReceived.mul(poolTokenSupply).div(totalStakeLamports);
+  const hasFee = !withdrawalFee.numerator.isZero() && !withdrawalFee.denominator.isZero();
+  if (!hasFee) {
+    return Numberu64.cloneFromBN(estDropletsBurnt);
+  }
+  // overflow safety: denominator > numerator enforced on-chain
+  const base = withdrawalFee.denominator.sub(withdrawalFee.numerator);
+  // Note: loss of precision for small estDropletsBurnt
+  return Numberu64.cloneFromBN(estDropletsBurnt.mul(withdrawalFee.denominator).div(base));
+}
+
+/**
+ * Sums up the total number of lamports withdrawn
+ * given an array of `ValidatorWithdrawalReceipt`s
+ * @param receipts 
+ * @returns 
+ */
+export function totalWithdrawLamports(
+  receipts: ValidatorWithdrawalReceipt[]
+): Numberu64 {
+  return receipts.reduce(
+    (accum, receipt) => Numberu64.cloneFromBN(accum.add(receipt.withdrawalReceipt.lamportsReceived)),
+    new Numberu64(0),
+  );
+}
+
+/**
+ * Sums up the total number of droplets (1 / 10 ** 9 scnSOL) paid
+ * in withdrawal fees given an array of `ValidatorWithdrawalReceipt`s
+ * @param receipts 
+ * @returns 
+ */
+export function totalWithdrawalFeesDroplets(
+  receipts: ValidatorWithdrawalReceipt[]
+): Numberu64 {
+  return receipts.reduce(
+    (accum, receipt) => Numberu64.cloneFromBN(accum.add(receipt.withdrawalReceipt.dropletsFeePaid)),
+    new Numberu64(0),
+  );
 }

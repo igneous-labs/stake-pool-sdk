@@ -100,6 +100,19 @@ export enum StakePoolError {
   InvalidSolDepositAuthority,
 }
 
+function bnToNumberu64Buffer(bn: BN | Numberu64): Buffer {
+  const a = bn.toArray().reverse();
+  const b = Buffer.from(a);
+  if (b.length === 8) {
+    return b;
+  }
+  assert(b.length < 8, "Numberu64 too large");
+
+  const zeroPad = Buffer.alloc(8);
+  b.copy(zeroPad);
+  return zeroPad;
+}
+
 /**
  * Some amount of tokens
  * Copied from token-swap, for packing instruction buffer correctly
@@ -109,16 +122,7 @@ export class Numberu64 extends BN {
    * Convert to Buffer representation
    */
   toBuffer(): Buffer {
-    const a = super.toArray().reverse();
-    const b = Buffer.from(a);
-    if (b.length === 8) {
-      return b;
-    }
-    assert(b.length < 8, "Numberu64 too large");
-
-    const zeroPad = Buffer.alloc(8);
-    b.copy(zeroPad);
-    return zeroPad;
+    return bnToNumberu64Buffer(this);
   }
 
   /**
@@ -133,6 +137,24 @@ export class Numberu64 extends BN {
         .join(""),
       16,
     );
+  }
+
+  /**
+   * Creates a new Numberu64 with the same value as an existing BN
+   * `new Numberu64(bn)` doesnt work, only copies the reference
+   * and doesnt override `toBuffer()`, so any BNs with buffer length < 8's `this.toBuffer()`
+   * will return short buffer that cant be serialized to TransactionInstruction
+   * @param bn: BN to copy
+   */
+  static cloneFromBN(bn: BN): Numberu64 {
+    return Numberu64.fromBuffer(bnToNumberu64Buffer(bn));
+  }
+
+  /**
+   * Saturating sub
+   */
+  satSub(other: Numberu64 | BN): Numberu64 {
+    return this.gt(other) ? Numberu64.cloneFromBN(this.sub(other)) : new Numberu64(0); 
   }
 }
 

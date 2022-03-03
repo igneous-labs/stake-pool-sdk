@@ -18,7 +18,7 @@ export class RpcError extends Error {
  * Given account does not exist
  */
 export class AccountDoesNotExistError extends Error {
-  readonly account: PublicKey
+  readonly account: PublicKey;
 
   constructor(
     account: PublicKey,
@@ -32,8 +32,8 @@ export class AccountDoesNotExistError extends Error {
  * The withdraw request is not serviceable (should never be thrown)
  */
 export class WithdrawalUnserviceableError extends Error {
-  constructor() {
-    super("Could not determine withdrawal procedure");
+  constructor(public readonly reason: string = "") {
+    super(`Could not determine withdrawal procedure: ${reason}`);
   }
 }
 

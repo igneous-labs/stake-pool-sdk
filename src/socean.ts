@@ -28,12 +28,10 @@ import {
   getOrCreateAssociatedAddress,
   getWithdrawAuthority,
   getWithdrawStakeTransactions,
-  validatorsToWithdrawFrom,
-  calcPoolPriceAndFee,
+  calcWithdrawals,
   tryRpc,
   getValidatorStakeAccount,
   getValidatorTransientStakeAccount,
-  calcDropletsReceivedForDeposit,
 } from "./stake-pool/utils";
 import {
   AccountDoesNotExistError,
@@ -53,7 +51,6 @@ import {
   TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS,
 } from "./transactions";
 import { signAndSendTransactionSequence } from ".";
-import { StakePool } from "./stake-pool/schema";
 
 export class Socean {
   public readonly config: SoceanConfig;
@@ -227,19 +224,11 @@ export class Socean {
       stakePool.account.data.validatorList,
     );
 
-    // get price and fee information and calculate the amounts
-    const [price, fee] = calcPoolPriceAndFee(stakePool);
-    const fromAmountDroplets = amountDroplets.toNumber();
-    const toAmountLamports = (1 - fee) * (fromAmountDroplets * price);
-
     // calculate the amounts to withdraw from for each validator
-    const amounts = await validatorsToWithdrawFrom(
-      new PublicKey(this.config.stakePoolProgramId),
-      new PublicKey(this.config.stakePoolAccountPubkey),
-      fromAmountDroplets,
-      toAmountLamports,
+    const validatorWithdrawalReceipts = await calcWithdrawals(
+      amountDroplets,
+      stakePool,
       validatorListAcc.account.data,
-      stakePool.account.data.reserveStake,
     );
 
     const [transactions, stakeAccounts] = await getWithdrawStakeTransactions(
@@ -248,7 +237,7 @@ export class Socean {
       this.config.stakePoolProgramId,
       stakePool,
       validatorListAcc,
-      amounts,
+      validatorWithdrawalReceipts,
     );
     const res = {
       transactionSequence: [transactions],
@@ -264,46 +253,6 @@ export class Socean {
       res.transactionSequence.unshift(...updateTxSeq);
     }
     return res;
-  }
-
-  /**
-   * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
-   * by the user for staking SOL, with deposit fees factored in.
-   * Note: if an epoch boundary crosses and the stake pool is updated, the scnSOL supply
-   * will no longer match and the result of this function will be incorrect
-   * @param lamportsToStake amount of SOL to be staked, in lamports
-   * @param stakePool the stake pool to stake to
-   * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
-   */
-  static calcDropletsReceivedForSolDeposit(
-    lamportsToStake: Numberu64,
-    stakePool: StakePool,
-  ): Numberu64 {
-    return calcDropletsReceivedForDeposit(
-      lamportsToStake,
-      stakePool,
-      stakePool.solDepositFee,
-    );
-  }
-
-  /**
-   * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
-   * by the user for staking stake account(s), with deposit fees factored in.
-   * Note: if an epoch boundary crosses and the stake pool is updated, the scnSOL supply
-   * will no longer match and the result of this function will be incorrect
-   * @param lamportsToStake SOL value of the stake accounts to be staked, in lamports
-   * @param stakePool the stake pool to stake to
-   * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
-   */
-  static calcDropletsReceivedForStakeDeposit(
-    lamportsToStake: Numberu64,
-    stakePool: StakePool,
-  ): Numberu64 {
-    return calcDropletsReceivedForDeposit(
-      lamportsToStake,
-      stakePool,
-      stakePool.stakeDepositFee,
-    );
   }
 
   private async signAndSend(
