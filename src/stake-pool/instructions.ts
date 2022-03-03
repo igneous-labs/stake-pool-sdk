@@ -231,10 +231,7 @@ export function updateValidatorListBalanceTransaction(
     { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
   ];
 
-  // TODO: fix this to make eslint happy
-  // eslint-disable-next-line no-restricted-syntax
-  for (const vsa of validatorStakeAccounts) {
-    const { main, transient } = vsa;
+  validatorStakeAccounts.forEach(({ main, transient }) => {
     keys.push({
       pubkey: main,
       isSigner: false,
@@ -245,7 +242,7 @@ export function updateValidatorListBalanceTransaction(
       isSigner: false,
       isWritable: true,
     });
-  }
+  });
 
   return new Transaction().add(
     new TransactionInstruction({

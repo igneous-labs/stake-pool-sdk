@@ -40,25 +40,21 @@ import {
 addStakePoolSchema(SOLANA_SCHEMA);
 
 export function reverse(object: any) {
-  // TODO: fix this to make eslint happy
-  // eslint-disable-next-line no-restricted-syntax
-  for (const val in object) {
+  Object.keys(object).forEach((val) => {
     if (object[val] instanceof PublicKey) {
       object[val] = new PublicKey(object[val].toBytes().reverse());
       // console.log(val, object[val].toString());
     } else if (object[val] instanceof Object) {
       reverse(object[val]);
     } else if (object[val] instanceof Array) {
-      // TODO: fix this to make eslint happy
-      // eslint-disable-next-line no-restricted-syntax
-      for (const elem of object[val]) {
+      object[val].forEach((elem) => {
         reverse(elem);
-      }
+      });
     }
     /* else {
       console.log(val, object[val]);
     } */
-  }
+  });
 }
 
 /**

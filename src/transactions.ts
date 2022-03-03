@@ -22,11 +22,9 @@ export interface TransactionWithSigners {
  */
 function partialSign(transaction: TransactionWithSigners): Transaction {
   const { tx, signers } = transaction;
-  // TODO: fix this to make eslint happy
-  // eslint-disable-next-line no-restricted-syntax
-  for (const signer of signers) {
+  signers.forEach((signer) => {
     tx.partialSign(signer);
-  }
+  });
   return tx;
 }
 
@@ -87,7 +85,7 @@ export async function signAndSendTransactionSequence(
   const feePayer = walletAdapter.publicKey;
   if (!feePayer) throw new WalletPublicKeyUnavailableError();
 
-  // TODO: fix this to make eslint happy
+  // Can't use async/await with forEach/map (or can with Promise.all which will run them in parallel)
   // eslint-disable-next-line no-restricted-syntax
   for (const transactionArray of transactionSequence) {
     const signatures = await signSendConfirmTransactions(
