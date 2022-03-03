@@ -33,7 +33,7 @@ export class AccountDoesNotExistError extends Error {
  */
 export class WithdrawalUnserviceableError extends Error {
   constructor(public readonly reason: string = "") {
-    super("Could not determine withdrawal procedure");
+    super(`Could not determine withdrawal procedure: ${reason}`);
   }
 }
 
