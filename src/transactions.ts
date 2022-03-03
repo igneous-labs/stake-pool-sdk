@@ -88,6 +88,7 @@ export async function signAndSendTransactionSequence(
   // Can't use async/await with forEach/map (or can with Promise.all which will run them in parallel)
   // eslint-disable-next-line no-restricted-syntax
   for (const transactionArray of transactionSequence) {
+    // eslint-disable-next-line no-await-in-loop
     const signatures = await signSendConfirmTransactions(
       walletAdapter,
       transactionArray,

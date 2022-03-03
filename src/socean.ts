@@ -34,7 +34,6 @@ import {
   updateStakePoolBalanceInstruction,
   updateValidatorListBalanceTransaction,
 } from "@/stake-pool/instructions";
-import { StakePool } from "@/stake-pool/schema";
 import {
   Numberu64,
   StakePoolAccount,
@@ -42,8 +41,7 @@ import {
   ValidatorListAccount,
 } from "@/stake-pool/types";
 import {
-  calcDropletsReceivedForDeposit,
-  calcPoolPriceAndFee,
+  calcWithdrawals,
   getOrCreateAssociatedAddress,
   getStakePoolFromAccountInfo,
   getValidatorListFromAccountInfo,
@@ -52,7 +50,6 @@ import {
   getWithdrawAuthority,
   getWithdrawStakeTransactions,
   tryRpc,
-  validatorsToWithdrawFrom,
 } from "@/stake-pool/utils";
 
 export class Socean {
@@ -227,19 +224,11 @@ export class Socean {
       stakePool.account.data.validatorList,
     );
 
-    // get price and fee information and calculate the amounts
-    const [price, fee] = calcPoolPriceAndFee(stakePool);
-    const fromAmountDroplets = amountDroplets.toNumber();
-    const toAmountLamports = (1 - fee) * (fromAmountDroplets * price);
-
     // calculate the amounts to withdraw from for each validator
-    const amounts = await validatorsToWithdrawFrom(
-      new PublicKey(this.config.stakePoolProgramId),
-      new PublicKey(this.config.stakePoolAccountPubkey),
-      fromAmountDroplets,
-      toAmountLamports,
+    const validatorWithdrawalReceipts = await calcWithdrawals(
+      amountDroplets,
+      stakePool,
       validatorListAcc.account.data,
-      stakePool.account.data.reserveStake,
     );
 
     const [transactions, stakeAccounts] = await getWithdrawStakeTransactions(
@@ -248,7 +237,7 @@ export class Socean {
       this.config.stakePoolProgramId,
       stakePool,
       validatorListAcc,
-      amounts,
+      validatorWithdrawalReceipts,
     );
     const res = {
       transactionSequence: [transactions],
@@ -264,46 +253,6 @@ export class Socean {
       res.transactionSequence.unshift(...updateTxSeq);
     }
     return res;
-  }
-
-  /**
-   * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
-   * by the user for staking SOL, with deposit fees factored in.
-   * Note: if an epoch boundary crosses and the stake pool is updated, the scnSOL supply
-   * will no longer match and the result of this function will be incorrect
-   * @param lamportsToStake amount of SOL to be staked, in lamports
-   * @param stakePool the stake pool to stake to
-   * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
-   */
-  static calcDropletsReceivedForSolDeposit(
-    lamportsToStake: Numberu64,
-    stakePool: StakePool,
-  ): Numberu64 {
-    return calcDropletsReceivedForDeposit(
-      lamportsToStake,
-      stakePool,
-      stakePool.solDepositFee,
-    );
-  }
-
-  /**
-   * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
-   * by the user for staking stake account(s), with deposit fees factored in.
-   * Note: if an epoch boundary crosses and the stake pool is updated, the scnSOL supply
-   * will no longer match and the result of this function will be incorrect
-   * @param lamportsToStake SOL value of the stake accounts to be staked, in lamports
-   * @param stakePool the stake pool to stake to
-   * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
-   */
-  static calcDropletsReceivedForStakeDeposit(
-    lamportsToStake: Numberu64,
-    stakePool: StakePool,
-  ): Numberu64 {
-    return calcDropletsReceivedForDeposit(
-      lamportsToStake,
-      stakePool,
-      stakePool.stakeDepositFee,
-    );
   }
 
   private async signAndSend(
@@ -398,6 +347,7 @@ export class Socean {
       const end = Math.min(voteAccounts.length, i + MAX_VALIDATORS_TO_UPDATE);
       const chunk = voteAccounts.slice(i, end);
 
+      // eslint-disable-next-line no-await-in-loop
       const validatorsAllStakeAccounts = await Promise.all(
         chunk.map((voteAccount) =>
           this.getValidatorAllStakeAccounts(voteAccount),
