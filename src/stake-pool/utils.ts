@@ -239,17 +239,6 @@ const STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS = new Numberu64(2_282_880);
 type ValidatorStakeAvailableToWithdraw = {
   lamports: Numberu64;
   stakeAccount: PublicKey;
-  /**
-   * Can only withdraw `secondaryLamports` from `secondaryStakeAccount`
-   * after `stakeAccount` is completely exhausted (all `lamports` withdrawn).
-   * 
-   * This will be the transient stake account and the lamports
-   * available to withdraw from it if both the transient stake account
-   * and main stake account exists,
-   * undefined otherwise.
-   */
-  secondaryLamports?: Numberu64;
-  secondaryStakeAccount?: PublicKey;
 }
 
 /**
@@ -293,10 +282,7 @@ async function stakeAvailableToWithdraw(
           validator.voteAccountAddress,
         )]
       : [transientWithdrawableLamports, transientStakeAccount];
-  const [secondaryLamports, secondaryStakeAccount] = (hasActive && hasTransient)
-        ? [transientWithdrawableLamports, transientStakeAccount]
-        : [undefined, undefined];
-  return { lamports, stakeAccount, secondaryLamports, secondaryStakeAccount };
+  return { lamports, stakeAccount };
 }
 
 function validatorTotalStake(validator: ValidatorStakeInfo): Numberu64 {
