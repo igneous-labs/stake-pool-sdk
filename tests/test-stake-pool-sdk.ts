@@ -8,7 +8,7 @@ import {
 } from "@solana/web3.js";
 import { Numberu64 } from "../src/stake-pool/types";
 import {
-  calcDropletsReceivedForSolDeposit,
+  calcSolDeposit,
   calcWithdrawals,
   Socean,
   totalWithdrawLamports,
@@ -195,7 +195,7 @@ describe("test basic functionalities", () => {
       }
     });
 
-    it("it calcDropletsReceivedForSolDeposit() matches actual droplets received", async () => {
+    it("it calcSolDeposit() matches actual droplets received", async () => {
       const socean = new Socean("testnet");
       const stakePool = await socean.getStakePoolAccount();
       let scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
@@ -205,7 +205,7 @@ describe("test basic functionalities", () => {
       const depositAmountSol = Math.random() / 4;
       const depositAmount = Math.round(depositAmountSol * LAMPORTS_PER_SOL);
       const depositAmountLamports = new Numberu64(depositAmount);
-      const expectedDroplets = calcDropletsReceivedForSolDeposit(
+      const { dropletsReceived } = calcSolDeposit(
         depositAmountLamports,
         stakePool.account.data,
       );
@@ -221,7 +221,7 @@ describe("test basic functionalities", () => {
 
       scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
       expect(scnSolAtaAcctInfo.amount.toNumber()).to.eq(
-        initialScnSolBalance.add(expectedDroplets).toNumber(),
+        initialScnSolBalance.add(dropletsReceived).toNumber(),
       );
     });
 

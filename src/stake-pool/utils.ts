@@ -19,6 +19,7 @@ import {
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
+import { BN } from "bn.js";
 
 import { RpcError, WithdrawalUnserviceableError } from "@/socean/err";
 import { TransactionWithSigners } from "@/socean/transactions";
@@ -30,10 +31,14 @@ import {
   ValidatorStakeInfo,
 } from "@/stake-pool/schema";
 import {
+  DepositReceipt,
   Numberu64,
   STAKE_STATE_LEN,
   StakePoolAccount,
   ValidatorListAccount,
+  ValidatorStakeAvailableToWithdraw,
+  ValidatorWithdrawalReceipt,
+  WithdrawalReceipt,
 } from "@/stake-pool/types";
 
 addStakePoolSchema(SOLANA_SCHEMA);
@@ -215,10 +220,10 @@ export async function calcWithdrawals(
 
   // might happen if many transient stake accounts
   if (!dropletsRemaining.isZero()) {
-    // cannot proceed directly to transient stake accounts
-    // even if main stake account is deleted because of
-    // MIN_ACTIVE_LAMPORTS
-    // cannot proceed directly to the reserves
+    // Cannot proceed directly to transient stake accounts
+    // even if main stake account is exhausted because of
+    // MIN_ACTIVE_LAMPORTS.
+    // Cannot proceed directly to the reserves
     // unless absolutely all stake accounts (main and transient) are deleted
     // and you can only delete a main stake account with RemoveValidator instruction
     throw new WithdrawalUnserviceableError(
@@ -248,11 +253,6 @@ const MIN_ACTIVE_STAKE_LAMPORTS = new Numberu64(1_000_000); // 0.001 SOL
 // TODO: this might change in the future if rent costs change
 // but since this is a const in the on-chain prog too, fuck it
 const STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS = new Numberu64(2_282_880);
-
-type ValidatorStakeAvailableToWithdraw = {
-  lamports: Numberu64;
-  stakeAccount: PublicKey;
-};
 
 /**
  * Gets the stake available to withdraw from a validator.
@@ -584,23 +584,39 @@ export async function getDefaultDepositAuthority(
  * @param stakePool
  * @param depositFee the Fee struct for the given deposit type,
  *                   should either be stakePool.solDepositFee or stakePool.stakeDepositFee
+ * @param referralFee the referral fee percentage for the given deposit type,
+ *                    should either be stakePool.solReferralFee or stakePool.stakeReferralFee
  * @returns expected droplets given in return for staking `lamportsToStake`, with deposit fees factored in
  */
-function calcDropletsReceivedForDeposit(
+function calcDeposit(
   lamportsToStake: Numberu64,
   stakePool: schema.StakePool,
   depositFee: schema.Fee,
-): Numberu64 {
+  referralFee: number,
+): DepositReceipt {
   const dropletsMinted = lamportsToStake
     .mul(stakePool.poolTokenSupply)
     .div(stakePool.totalStakeLamports);
   const hasFee =
     !depositFee.numerator.isZero() && !depositFee.denominator.isZero();
-  const depositFeeDroplets = hasFee
-    ? depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator)
+  const dropletsFeePaid = hasFee
+    ? Numberu64.cloneFromBN(
+        depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator),
+      )
     : new Numberu64(0);
+  const referralFeePaid = Numberu64.cloneFromBN(
+    dropletsFeePaid.mul(new BN(referralFee)).div(new BN(100)),
+  );
   // overflow safety: depositFee < 1.0
-  return Numberu64.cloneFromBN(dropletsMinted.sub(depositFeeDroplets));
+  const dropletsReceived = Numberu64.cloneFromBN(
+    dropletsMinted.sub(dropletsFeePaid),
+  );
+  return {
+    lamportsStaked: lamportsToStake,
+    dropletsReceived,
+    dropletsFeePaid,
+    referralFeePaid,
+  };
 }
 
 /**
@@ -612,14 +628,15 @@ function calcDropletsReceivedForDeposit(
  * @param stakePool the stake pool to stake to
  * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
  */
-export function calcDropletsReceivedForSolDeposit(
+export function calcSolDeposit(
   lamportsToStake: Numberu64,
   stakePool: schema.StakePool,
-): Numberu64 {
-  return calcDropletsReceivedForDeposit(
+): DepositReceipt {
+  return calcDeposit(
     lamportsToStake,
     stakePool,
     stakePool.solDepositFee,
+    stakePool.solReferralFee,
   );
 }
 
@@ -632,51 +649,17 @@ export function calcDropletsReceivedForSolDeposit(
  * @param stakePool the stake pool to stake to
  * @returns the amount of droplets (1 / 10 ** 9 scnSOL) to be received by the user
  */
-export function calcDropletsReceivedForStakeDeposit(
+export function calcStakeDeposit(
   lamportsToStake: Numberu64,
   stakePool: schema.StakePool,
-): Numberu64 {
-  return calcDropletsReceivedForDeposit(
+): DepositReceipt {
+  return calcDeposit(
     lamportsToStake,
     stakePool,
     stakePool.stakeDepositFee,
+    stakePool.stakeReferralFee,
   );
 }
-
-/**
- * Breakdown of a single withdrawal from a single stake account in the stake pool
- */
-export type WithdrawalReceipt = {
-  /**
-   * Number of droplets that was unstaked/withdrawn
-   */
-  dropletsUnstaked: Numberu64;
-  /**
-   * Number of lamports the user should receive from the withdrawal,
-   * with withdrawal fees deducted
-   */
-  lamportsReceived: Numberu64;
-  /**
-   * Number of droplets paid by the user in withdrawal fees
-   */
-  dropletsFeePaid: Numberu64;
-};
-
-/**
- * A withdrawal receipt for a single stake account in the stake pool
- * + the stakeAccount to make the withdrawal from
- */
-export type ValidatorWithdrawalReceipt = {
-  /**
-   * The stake account to make this withdrawal from.
-   * Can be a validator stake account, transient stake account, or the pool's reserve stake account.
-   */
-  stakeAccount: PublicKey;
-  /**
-   * The calculated withdrawal receipt for this stake account
-   */
-  withdrawalReceipt: WithdrawalReceipt;
-};
 
 /**
  * Helper function for calculating expected lamports given the amount of droplets to withdraw.

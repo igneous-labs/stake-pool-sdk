@@ -1,10 +1,13 @@
 export { Socean } from "@/socean/socean";
 export { SoceanConfig, ClusterType } from "@/socean/config";
 export {
+  DepositReceipt,
   StakePoolAccount,
+  Numberu64,
   ValidatorListAccount,
   ValidatorAllStakeAccounts,
-  Numberu64,
+  ValidatorWithdrawalReceipt,
+  WithdrawalReceipt,
 } from "@/stake-pool/types";
 export {
   signAndSendTransactionSequence,
@@ -14,11 +17,9 @@ export {
   WalletAdapter,
 } from "@/socean/transactions";
 export {
-  calcDropletsReceivedForSolDeposit,
-  calcDropletsReceivedForStakeDeposit,
+  calcSolDeposit,
+  calcStakeDeposit,
   calcWithdrawals,
   totalWithdrawLamports,
   totalWithdrawalFeesDroplets,
-  WithdrawalReceipt,
-  ValidatorWithdrawalReceipt,
 } from "@/stake-pool/utils";
