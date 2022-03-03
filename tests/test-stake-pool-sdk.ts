@@ -117,7 +117,7 @@ describe('test basic functionalities', () => {
       expect(scnSolAmt.toNumber()).to.be.above(0);
   
       // withdraw all scnSOL
-      const { transactionSignatures, stakeAccounts } = await socean.withdrawStake(staker, scnSolAmt);
+      const { transactionSignatures, stakeAccounts } = await socean.withdrawStake(staker, Numberu64.cloneFromBN(scnSolAmt));
       const lastWithdrawTxId = transactionSignatures.pop().pop();
       // wait until the last tx (withdraw) is finalized
       await connection.confirmTransaction(lastWithdrawTxId, "finalized");

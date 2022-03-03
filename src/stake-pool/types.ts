@@ -149,6 +149,13 @@ export class Numberu64 extends BN {
   static cloneFromBN(bn: BN): Numberu64 {
     return Numberu64.fromBuffer(bnToNumberu64Buffer(bn));
   }
+
+  /**
+   * Saturating sub
+   */
+  satSub(other: Numberu64 | BN): Numberu64 {
+    return this.gt(other) ? Numberu64.cloneFromBN(this.sub(other)) : new Numberu64(0); 
+  }
 }
 
 export type ValidatorAllStakeAccounts = {

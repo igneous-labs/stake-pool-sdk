@@ -102,6 +102,41 @@ export function getValidatorListFromAccountInfo(
 }
 
 /**
+ * Attempt to service part of a withdrawal with some amount of lamports available to withdraw
+ * @param withdrawalAmountDroplets amount to withdraw in droplets.
+ *                                 The returned `WithdrawalReceipt` should aim to service
+ *                                 part of or all of this amount.
+ * @param lamportsAvailable lamports available to service this withdrawal
+ * @param stakePool
+ * @returns the WithdrawalReceipt serviced by `lamportsAvailable`.
+ *          `dropletsUnstaked` and/or `lamportsReceived` may be zero
+ * @throws WithdrawalUnserviceableError if calculation error occurs
+ */
+function tryServiceWithdrawal(
+  withdrawalAmountDroplets: Numberu64,
+  lamportsAvailable: Numberu64,
+  stakePool: schema.StakePool
+): WithdrawalReceipt {
+  const dropletsServiceable = estDropletsUnstakedByWithdrawal(lamportsAvailable, stakePool);
+  const dropletsServiced = withdrawalAmountDroplets.lt(dropletsServiceable)
+    ? withdrawalAmountDroplets
+    : dropletsServiceable;
+  const withdrawalReceipt = calcWithdrawalReceipt(
+    dropletsServiced,
+    stakePool
+  );
+  // check that the withdrawal is indeed serviceable
+  if (withdrawalReceipt.lamportsReceived.gt(lamportsAvailable)) {
+    // rounding error happened somewhere
+    throw new WithdrawalUnserviceableError(
+      `Stake account only has ${lamportsAvailable.toNumber()} lamports`
+      + `, not enough to service ${withdrawalReceipt.lamportsReceived.toNumber()} lamports required for withdrawal`
+    );
+  }
+  return withdrawalReceipt;
+}
+
+/**
  * Calculates the withdrawal procedure - how many lamports to split and withdraw from each validator stake account
  * given a desired number of droplets to withdraw.
  *
@@ -135,39 +170,30 @@ export async function calcWithdrawals(
 
 
   const sortedValidators = validatorsByTotalStakeAsc(validators);
+  const validatorStakeAvailableToWithdraw = await Promise.all(sortedValidators.map(
+    (validator) => stakeAvailableToWithdraw(validator, stakePoolProgramId, stakePoolPubkey)
+  ));
   const res: ValidatorWithdrawalReceipt[] = [];
   
   let dropletsRemaining = withdrawalAmountDroplets;
 
   // Withdraw from the lightest validators first
-  for (const validator of sortedValidators) {
+  for (const { lamports, stakeAccount } of validatorStakeAvailableToWithdraw) {
     if (dropletsRemaining.isZero()) {
       break;
     }
-    const { lamports, stakeAccount } = await stakeAvailableToWithdraw(validator, stakePoolProgramId, stakePoolPubkey);
-    if (lamports.isZero()) {
-      continue;
-    }
-    const dropletsServiceable = estDropletsUnstakedByWithdrawal(lamports, stakePool);
-    const dropletsServiced = Numberu64.min(dropletsRemaining, dropletsServiceable);
-    
-    // check that the withdrawal indeed serviceable
-    const withdrawalReceipt = calcWithdrawalReceipt(
-      dropletsServiced,
+    const withdrawalReceipt = tryServiceWithdrawal(
+      dropletsRemaining,
+      lamports,
       stakePool
     );
-    if (withdrawalReceipt.lamportsReceived.gt(lamports)) {
-      // rounding error happened somewhere
-      throw new WithdrawalUnserviceableError(
-        `Stake account ${stakeAccount.toString()} only has ${lamports.toNumber()} lamports`
-        + `, not enough to service requested ${withdrawalReceipt.lamportsReceived.toNumber()} withdrawal`
-      );
+    if (!withdrawalReceipt.dropletsUnstaked.isZero() && !withdrawalReceipt.lamportsReceived.isZero()) {
+      res.push({
+        stakeAccount,
+        withdrawalReceipt,
+      });
+      dropletsRemaining = dropletsRemaining.satSub(withdrawalReceipt.dropletsUnstaked);
     }
-    res.push({
-      stakeAccount,
-      withdrawalReceipt,
-    });
-    dropletsRemaining = dropletsRemaining.sub(dropletsServiced);
   }
 
   // might happen if many transient stake accounts
@@ -210,6 +236,22 @@ const MIN_ACTIVE_STAKE_LAMPORTS = new Numberu64(1_000_000); // 0.001 SOL
 // but since this is a const in the on-chain prog too, fuck it
 const STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS = new Numberu64(2_282_880);
 
+type ValidatorStakeAvailableToWithdraw = {
+  lamports: Numberu64;
+  stakeAccount: PublicKey;
+  /**
+   * Can only withdraw `secondaryLamports` from `secondaryStakeAccount`
+   * after `stakeAccount` is completely exhausted (all `lamports` withdrawn).
+   * 
+   * This will be the transient stake account and the lamports
+   * available to withdraw from it if both the transient stake account
+   * and main stake account exists,
+   * undefined otherwise.
+   */
+  secondaryLamports?: Numberu64;
+  secondaryStakeAccount?: PublicKey;
+}
+
 /**
  * Gets the stake available to withdraw from a validator.
  * This is `activeStakeLamports` if there is an active stake account
@@ -226,33 +268,35 @@ async function stakeAvailableToWithdraw(
   validator: ValidatorStakeInfo,
   stakePoolProgramId: PublicKey,
   stakePoolPubkey: PublicKey
-): Promise<{
-  lamports: Numberu64,
-  stakeAccount: PublicKey,
-}> {
+): Promise<ValidatorStakeAvailableToWithdraw> {
   // must withdraw from active stake account if active stake account has non-zero balance
-  const isActive = !validator.activeStakeLamports.isZero();
+  const hasActive = !validator.activeStakeLamports.isZero(); // false if validator is newly added
+  const hasTransient = !validator.transientStakeLamports.isZero();
   // this is fucking stupid but 
   // `transientStakeLamports` = rent exempt reserve + delegation.stake, whereas
   // `activeStakeLamports` = delegation.stake - MIN_ACTIVE_STAKE_LAMPORTS.
   // You're only allowed to withdraw delegation.stake - MIN_ACTIVE_STAKE_LAMPORTS lamports.
   // I've forgotten WHY THE FUCK these 2 values are semantically different in the on-chain prog,
   // probably to make the merge transient stake to active stake calculation easier
-  const lamports = isActive ? Numberu64.cloneFromBN(validator.activeStakeLamports)
-    : Numberu64.cloneFromBN(validator.transientStakeLamports.sub(STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS).sub(MIN_ACTIVE_STAKE_LAMPORTS));
-  const stakeAccount = await (isActive
-    ? getValidatorStakeAccount(
-        stakePoolProgramId,
-        stakePoolPubkey,
-        validator.voteAccountAddress,
-      )
-    : getValidatorTransientStakeAccount(
-      stakePoolProgramId,
-      stakePoolPubkey,
-      validator.voteAccountAddress,
-    )
+  const activeWithdrawableLamports = Numberu64.cloneFromBN(validator.activeStakeLamports);
+  const transientUnwithdrawableLamports = STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS.add(MIN_ACTIVE_STAKE_LAMPORTS);
+  const transientWithdrawableLamports = Numberu64.cloneFromBN(validator.transientStakeLamports).satSub(transientUnwithdrawableLamports);
+  const transientStakeAccount = await getValidatorTransientStakeAccount(
+    stakePoolProgramId,
+    stakePoolPubkey,
+    validator.voteAccountAddress,
   );
-  return { lamports, stakeAccount };
+  const [lamports, stakeAccount] = hasActive
+      ? [activeWithdrawableLamports, await getValidatorStakeAccount(
+          stakePoolProgramId,
+          stakePoolPubkey,
+          validator.voteAccountAddress,
+        )]
+      : [transientWithdrawableLamports, transientStakeAccount];
+  const [secondaryLamports, secondaryStakeAccount] = (hasActive && hasTransient)
+        ? [transientWithdrawableLamports, transientStakeAccount]
+        : [undefined, undefined];
+  return { lamports, stakeAccount, secondaryLamports, secondaryStakeAccount };
 }
 
 function validatorTotalStake(validator: ValidatorStakeInfo): Numberu64 {
@@ -529,6 +573,7 @@ function calcDropletsReceivedForDeposit(lamportsToStake: Numberu64, stakePool: s
   const dropletsMinted = lamportsToStake.mul(stakePool.poolTokenSupply).div(stakePool.totalStakeLamports);
   const hasFee = !depositFee.numerator.isZero() && !depositFee.denominator.isZero();
   const depositFeeDroplets = hasFee ? depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator) : new Numberu64(0);
+  // overflow safety: depositFee < 1.0
   return Numberu64.cloneFromBN(dropletsMinted.sub(depositFeeDroplets));
 }
 
@@ -609,6 +654,7 @@ function calcWithdrawalReceipt(dropletsToUnstake: Numberu64, stakePool: schema.S
   // on-chain logic: the withdrawal fee is levied first
   const hasFee = !withdrawalFee.numerator.isZero() && !withdrawalFee.denominator.isZero();
   const dropletsFeePaid = hasFee ? Numberu64.cloneFromBN(withdrawalFee.numerator.mul(dropletsToUnstake).div(withdrawalFee.denominator)) : new Numberu64(0);
+  // overflow safety: withdrawalFee < 1.0
   const dropletsBurnt = dropletsToUnstake.sub(dropletsFeePaid);
   const num = dropletsBurnt.mul(totalStakeLamports);
   if (num.lt(poolTokenSupply) || poolTokenSupply.isZero()) {
@@ -619,6 +665,7 @@ function calcWithdrawalReceipt(dropletsToUnstake: Numberu64, stakePool: schema.S
     };
   }
   // on-chain logic is ceil div
+  // overflow safety: 1 < num + poolTokenSupply
   const lamportsReceived = Numberu64.cloneFromBN(num.add(poolTokenSupply).sub(new Numberu64(1)).div(poolTokenSupply));
   return {
     dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
@@ -641,6 +688,7 @@ function estDropletsUnstakedByWithdrawal(lamportsReceived: Numberu64, stakePool:
   if (!hasFee) {
     return Numberu64.cloneFromBN(estDropletsBurnt);
   }
+  // overflow safety: denominator > numerator enforced on-chain
   const base = withdrawalFee.denominator.sub(withdrawalFee.numerator);
   // Note: loss of precision for small estDropletsBurnt
   return Numberu64.cloneFromBN(estDropletsBurnt.mul(withdrawalFee.denominator).div(base));
@@ -656,7 +704,7 @@ export function totalWithdrawLamports(
   receipts: ValidatorWithdrawalReceipt[]
 ): Numberu64 {
   return receipts.reduce(
-    (accum, receipt) => accum.add(receipt.withdrawalReceipt.lamportsReceived),
+    (accum, receipt) => Numberu64.cloneFromBN(accum.add(receipt.withdrawalReceipt.lamportsReceived)),
     new Numberu64(0),
   );
 }
@@ -671,7 +719,7 @@ export function totalWithdrawalFeesDroplets(
   receipts: ValidatorWithdrawalReceipt[]
 ): Numberu64 {
   return receipts.reduce(
-    (accum, receipt) => accum.add(receipt.withdrawalReceipt.dropletsFeePaid),
+    (accum, receipt) => Numberu64.cloneFromBN(accum.add(receipt.withdrawalReceipt.dropletsFeePaid)),
     new Numberu64(0),
   );
 }
