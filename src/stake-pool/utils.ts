@@ -20,8 +20,6 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 
-import BN from 'bn.js';
-
 import {
   StakePoolAccount,
   STAKE_STATE_LEN,
@@ -174,10 +172,14 @@ export async function calcWithdrawals(
 
   // might happen if many transient stake accounts
   if (!dropletsRemaining.isZero()) {
+    // cannot proceed directly to transient stake accounts
+    // even if main stake account is deleted because of
+    // MIN_ACTIVE_LAMPORTS
     // cannot proceed directly to the reserves
     // unless absolutely all stake accounts (main and transient) are deleted
+    // and you can only delete a main stake account with RemoveValidator instruction
     throw new WithdrawalUnserviceableError(
-      "Too many transient stake accounts, please try again on the next epoch"
+      "Too many transient stake accounts, please try again with a smaller withdraw amount or on the next epoch"
     );
   }
   
