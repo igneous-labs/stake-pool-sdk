@@ -8,7 +8,7 @@ import { AccountInfo, PublicKey } from "@solana/web3.js";
 import assert from "assert";
 import BN from "bn.js";
 
-import * as schema from "./schema";
+import * as schema from "@/stake-pool/schema";
 
 /** length of the stake account in bytes */
 export const STAKE_STATE_LEN = 200;
@@ -154,11 +154,13 @@ export class Numberu64 extends BN {
    * Saturating sub
    */
   satSub(other: Numberu64 | BN): Numberu64 {
-    return this.gt(other) ? Numberu64.cloneFromBN(this.sub(other)) : new Numberu64(0); 
+    return this.gt(other)
+      ? Numberu64.cloneFromBN(this.sub(other))
+      : new Numberu64(0);
   }
 }
 
 export type ValidatorAllStakeAccounts = {
-  main: PublicKey,
-  transient: PublicKey,
-}
+  main: PublicKey;
+  transient: PublicKey;
+};

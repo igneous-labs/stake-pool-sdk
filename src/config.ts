@@ -3,7 +3,7 @@
  *
  * @module
  */
-import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import { clusterApiUrl, Connection, PublicKey } from "@solana/web3.js";
 
 const TESTNET_STAKEPOOL_ACCOUNT =
   "5oc4nDMhYqP8dB5DW8DHtoLJpcasB19Tacu3GWAMbQAC";
@@ -25,7 +25,9 @@ export type ClusterType = "mainnet-beta" | "testnet" | "devnet";
  */
 export class SoceanConfig {
   stakePoolAccountPubkey: PublicKey;
+
   stakePoolProgramId: PublicKey;
+
   connection: Connection;
 
   constructor(
@@ -45,12 +47,15 @@ export class SoceanConfig {
         this.stakePoolAccountPubkey = new PublicKey(DEVNET_STAKEPOOL_ACCOUNT);
         this.stakePoolProgramId = new PublicKey(DEVNET_STAKEPOOL_PROGRAM_ID);
         break;
+      default:
+        throw new Error("clusterType must be specified");
     }
-    if (connectionOption instanceof Connection)
+    if (connectionOption instanceof Connection) {
       this.connection = connectionOption;
-    else
+    } else {
       this.connection = new Connection(
         connectionOption ?? clusterApiUrl(clusterType),
       );
+    }
   }
 }

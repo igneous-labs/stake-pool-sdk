@@ -5,52 +5,52 @@
  *
  * @module
  */
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
-  Transaction,
-  PublicKey,
-  Keypair,
   ConfirmOptions,
   Connection,
+  Keypair,
+  PublicKey,
+  Transaction,
 } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import BN from "bn.js";
 
-import { SoceanConfig, ClusterType } from "./config";
-import {
-  ValidatorListAccount,
-  StakePoolAccount,
-  Numberu64,
-  ValidatorAllStakeAccounts,
-} from "./stake-pool/types";
-import {
-  getStakePoolFromAccountInfo,
-  getValidatorListFromAccountInfo,
-  getOrCreateAssociatedAddress,
-  getWithdrawAuthority,
-  getWithdrawStakeTransactions,
-  calcWithdrawals,
-  tryRpc,
-  getValidatorStakeAccount,
-  getValidatorTransientStakeAccount,
-} from "./stake-pool/utils";
+import { signAndSendTransactionSequence } from "@/socean";
+import { ClusterType, SoceanConfig } from "@/socean/config";
 import {
   AccountDoesNotExistError,
   WalletPublicKeyUnavailableError,
-} from "./err";
+} from "@/socean/err";
+import {
+  TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS,
+  TransactionSequence,
+  TransactionSequenceSignatures,
+  TransactionWithSigners,
+  WalletAdapter,
+} from "@/socean/transactions";
 import {
   cleanupRemovedValidatorsInstruction,
   depositSolInstruction,
   updateStakePoolBalanceInstruction,
   updateValidatorListBalanceTransaction,
-} from "./stake-pool/instructions";
+} from "@/stake-pool/instructions";
 import {
-  WalletAdapter,
-  TransactionSequence,
-  TransactionSequenceSignatures,
-  TransactionWithSigners,
-  TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS,
-} from "./transactions";
-import { signAndSendTransactionSequence } from ".";
+  Numberu64,
+  StakePoolAccount,
+  ValidatorAllStakeAccounts,
+  ValidatorListAccount,
+} from "@/stake-pool/types";
+import {
+  calcWithdrawals,
+  getOrCreateAssociatedAddress,
+  getStakePoolFromAccountInfo,
+  getValidatorListFromAccountInfo,
+  getValidatorStakeAccount,
+  getValidatorTransientStakeAccount,
+  getWithdrawAuthority,
+  getWithdrawStakeTransactions,
+  tryRpc,
+} from "@/stake-pool/utils";
 
 export class Socean {
   public readonly config: SoceanConfig;
@@ -347,6 +347,7 @@ export class Socean {
       const end = Math.min(voteAccounts.length, i + MAX_VALIDATORS_TO_UPDATE);
       const chunk = voteAccounts.slice(i, end);
 
+      // eslint-disable-next-line no-await-in-loop
       const validatorsAllStakeAccounts = await Promise.all(
         chunk.map((voteAccount) =>
           this.getValidatorAllStakeAccounts(voteAccount),

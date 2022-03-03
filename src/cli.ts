@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import yargs from "yargs/yargs";
 import { hideBin } from "yargs/helpers";
+import yargs from "yargs/yargs";
 
-import { Socean } from ".";
+import { Socean } from "@/socean";
 
 const SOCEAN = new Socean();
 
