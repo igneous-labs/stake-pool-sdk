@@ -1,4 +1,8 @@
-import { expect } from "chai";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  Token,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import {
   clusterApiUrl,
   Connection,
@@ -6,24 +10,21 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
 } from "@solana/web3.js";
-import { Numberu64 } from "../src/stake-pool/types";
+import { expect } from "chai";
+
 import {
   calcSolDeposit,
   calcWithdrawals,
   Socean,
   totalWithdrawLamports,
-} from "../src";
+} from "@/socean";
+import { Numberu64 } from "@/stake-pool/types";
 import {
   cleanupAllStakeAccs,
   getStakeAccounts,
   MockWalletAdapter,
   prepareStaker,
-} from "./utils";
-import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  Token,
-  TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
+} from "@/tests/utils";
 
 describe("test basic functionalities", () => {
   it("it initializes and gets stake pool account", async () => {
@@ -150,9 +151,9 @@ describe("test basic functionalities", () => {
         await socean.depositSol(staker, new Numberu64(depositAmount))
       )
         .pop()
-        .pop();
+        ?.pop();
       // wait until the last tx (deposit) is finalized
-      await connection.confirmTransaction(lastDepositTxId, "finalized");
+      await connection.confirmTransaction(lastDepositTxId!, "finalized");
       console.log("deposit tx id:", lastDepositTxId);
 
       // assert the balance decreased by ~0.5
@@ -173,9 +174,9 @@ describe("test basic functionalities", () => {
       // withdraw all scnSOL
       const { transactionSignatures, stakeAccounts } =
         await socean.withdrawStake(staker, Numberu64.cloneFromBN(scnSolAmt));
-      const lastWithdrawTxId = transactionSignatures.pop().pop();
+      const lastWithdrawTxId = transactionSignatures.pop()?.pop();
       // wait until the last tx (withdraw) is finalized
-      await connection.confirmTransaction(lastWithdrawTxId, "finalized");
+      await connection.confirmTransaction(lastWithdrawTxId!, "finalized");
       console.log("withdraw tx id:", lastWithdrawTxId);
 
       // assert scnSOL account empty
@@ -190,9 +191,9 @@ describe("test basic functionalities", () => {
         connection,
         stakeAccountPubkeys,
       );
-      for (const stakeAccount of allStakeAccounts) {
+      allStakeAccounts.forEach((stakeAccount) => {
         expect(Number(stakeAccount.delegation.stake)).to.be.above(0);
-      }
+      });
     });
 
     it("it calcSolDeposit() matches actual droplets received", async () => {
@@ -215,9 +216,9 @@ describe("test basic functionalities", () => {
         await socean.depositSol(staker, depositAmountLamports)
       )
         .pop()
-        .pop();
+        ?.pop();
       // wait until the last tx (deposit) is finalized
-      await connection.confirmTransaction(lastDepositTxId, "finalized");
+      await connection.confirmTransaction(lastDepositTxId!, "finalized");
 
       scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
       expect(scnSolAtaAcctInfo.amount.toNumber()).to.eq(
@@ -231,7 +232,9 @@ describe("test basic functionalities", () => {
       const validatorList = await socean.getValidatorListAccount(
         stakePool.account.data.validatorList,
       );
-      let scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(scnSolAtaPubkey);
+      const scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(
+        scnSolAtaPubkey,
+      );
       const initialBalanceDroplets = scnSolAtaAcctInfo.amount;
 
       // check using a random withdrawal of 0-initialScnSolBalance scnSOL
@@ -248,7 +251,7 @@ describe("test basic functionalities", () => {
       const { stakeAccounts, transactionSignatures } =
         await socean.withdrawStake(staker, withdrawAmountDroplets);
       // wait until the last tx (withdraw) is finalized
-      await connection.confirmTransaction(transactionSignatures.pop().pop());
+      await connection.confirmTransaction(transactionSignatures.pop()?.pop()!);
 
       const expectedLamports = totalWithdrawLamports(
         validatorWithdrawalReceipts,
