@@ -1,30 +1,32 @@
+/* eslint-disable no-await-in-loop */
 import {
-  LAMPORTS_PER_SOL,
   Connection,
-  Transaction,
-  PublicKey,
   Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
   StakeProgram,
+  Transaction,
 } from "@solana/web3.js";
 import { readFileSync } from "fs";
-import { WalletAdapter } from "../src";
 import path from "path";
-import { Numberu64, STAKE_STATE_LEN } from "../src/stake-pool/types";
+
+import { WalletAdapter } from "@/socean";
+import { STAKE_STATE_LEN } from "@/socean/stake-pool/types";
 
 export const airdrop = async (
   connection: Connection,
   pubkey: PublicKey,
   amount: number = 1,
 ): Promise<void> => {
-  //airdrop tokens
+  // airdrop tokens
   await connection.confirmTransaction(
     await connection.requestAirdrop(pubkey, amount * LAMPORTS_PER_SOL),
     "finalized",
   );
 };
 
-export const keypairFromLocalFile = (filepath: string): Keypair => {
-  return Keypair.fromSecretKey(
+export const keypairFromLocalFile = (filepath: string): Keypair =>
+  Keypair.fromSecretKey(
     Buffer.from(
       JSON.parse(
         readFileSync(path.resolve(__dirname, filepath), {
@@ -33,7 +35,6 @@ export const keypairFromLocalFile = (filepath: string): Keypair => {
       ),
     ),
   );
-};
 
 export class MockWalletAdapter implements WalletAdapter {
   publicKey: PublicKey;
@@ -44,6 +45,7 @@ export class MockWalletAdapter implements WalletAdapter {
 
   async signAllTransactions(txs: Transaction[]): Promise<Transaction[]> {
     // Note: must use partialSign(). sign() overwrites all signatures
+    // eslint-disable-next-line no-underscore-dangle
     txs.forEach((tx) => tx.partialSign(this._keypair));
     return txs;
   }
@@ -140,14 +142,14 @@ export const cleanupAllStakeAccs = async (
         i + MAX_STAKE_DEACTIVATE_IX_PER_TX,
       ),
     );
-    const tx = chunk.reduce((tx, { pubkey }) => {
-      tx.add(
+    const tx = chunk.reduce((innerTx, { pubkey }) => {
+      innerTx.add(
         StakeProgram.deactivate({
           authorizedPubkey: owner.publicKey,
           stakePubkey: pubkey,
         }).instructions[0],
       );
-      return tx;
+      return innerTx;
     }, new Transaction());
     await connection.sendTransaction(tx, [owner]);
   }
@@ -163,8 +165,8 @@ export const cleanupAllStakeAccs = async (
         i + MAX_STAKE_WITHDRAW_IX_PER_TX,
       ),
     );
-    const tx = chunk.reduce((tx, { pubkey, lamports }) => {
-      tx.add(
+    const tx = chunk.reduce((innerTx, { pubkey, lamports }) => {
+      innerTx.add(
         StakeProgram.withdraw({
           authorizedPubkey: owner.publicKey,
           lamports,
@@ -172,7 +174,7 @@ export const cleanupAllStakeAccs = async (
           toPubkey: owner.publicKey,
         }).instructions[0],
       );
-      return tx;
+      return innerTx;
     }, new Transaction());
     await connection.sendTransaction(tx, [owner]);
   }
@@ -223,7 +225,7 @@ const getAllStakeAccounts = async (
       ],
     },
   );
-  return parsedStakeAccounts.reduce(
+  return parsedStakeAccounts.reduce<UserStakeAccounts>(
     (res, account) => {
       const activationState = determineStakeActivation(
         // @ts-ignore
@@ -255,10 +257,10 @@ const determineStakeActivation = (
     delegation: { activationEpoch, deactivationEpoch },
   } = parsedStakeAccount;
   if (activationEpoch === EPOCH_MAX_STRING) return "inactive";
-  else if (Number(activationEpoch) >= currentEpoch) return "activating";
-  else if (deactivationEpoch === EPOCH_MAX_STRING) return "active";
-  else if (Number(deactivationEpoch) >= currentEpoch) return "deactivating";
-  else return "inactive";
+  if (Number(activationEpoch) >= currentEpoch) return "activating";
+  if (deactivationEpoch === EPOCH_MAX_STRING) return "active";
+  if (Number(deactivationEpoch) >= currentEpoch) return "deactivating";
+  return "inactive";
 };
 
 export const getStakeAccounts = async (

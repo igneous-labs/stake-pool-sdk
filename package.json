@@ -42,7 +42,7 @@
     "ts-node": "ts-node",
     "docs": "typedoc --entryPoints src/index.ts",
     "build:cjs": "tsc -p tsconfig.cjs.json",
-    "build:esm": "tsc -p tsconfig.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
     "build": "yarn clean && yarn build:cjs && yarn build:esm",
     "build-all": "yarn build && yarn esbuild-node && yarn esbuild-browser",
     "esbuild-browser": "esbuild src/browser.ts --bundle --minify --sourcemap=external --outfile=dist/esbuild/browser.js",
