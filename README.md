@@ -24,8 +24,6 @@ This SDK provide a client to interact with the staking protocol and allows you
 to stake and unstake through socean stake pool within your applications.
 
 Contents:
-
-- [<div align="center"><a href="https://socean.fi/"><img src="https://raw.githubusercontent.com/igneous-labs/stake-pool-sdk/master/assets/logo.png" height="100" alt="Socean"></a></div>](#div-aligncenterdiv)
 - [Socean Stake Pool Typescript SDK](#socean-stake-pool-typescript-sdk)
   - [Installation](#installation)
     - [npm](#npm)
