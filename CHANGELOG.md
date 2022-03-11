@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - support for large withdrawal
  - `Socean` constructor to accept optional web3 connection or custom rpc url
  - `SoceanConfig` to be public
+ - `buffer-layout` package was replaced by `@solana/buffer-layout`
 
 ### Added
  - types for bn.js
