@@ -1,6 +1,6 @@
 {
   "name": "@soceanfi/stake-pool-sdk",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Socean Stake Pool Typescript SDK",
   "author": "socean finance <socean@socean.fi>",
   "repository": "https://github.com/igneous-labs/stake-pool-sdk",
