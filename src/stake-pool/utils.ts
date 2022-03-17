@@ -398,8 +398,8 @@ export async function getWithdrawStakeTransactions(
   validatorList: ValidatorListAccount,
   validatorWithdrawalReceipts: ValidatorWithdrawalReceipt[],
 ): Promise<[TransactionWithSigners[], Keypair[]]> {
-  // TODO: confirm this number
-  const MAX_WITHDRAWALS_PER_TX = 4;
+  // 4 results in Error: Transaction too large: 1326 > 1232
+  const MAX_WITHDRAWALS_PER_TX = 3;
 
   const stakePoolData = stakePool.account.data;
   const stakePoolWithdrawAuthority = await getWithdrawAuthority(
