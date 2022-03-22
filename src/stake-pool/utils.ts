@@ -184,10 +184,18 @@ export async function calcWithdrawals(
       },
     ];
 
+  const stakePoolHasActive = validators.some(
+    (info) => !info.activeStakeLamports.isZero(),
+  );
   const sortedValidators = validatorsByTotalStakeAsc(validators);
   const validatorStakeAvailableToWithdraw = await Promise.all(
     sortedValidators.map((validator) =>
-      stakeAvailableToWithdraw(validator, stakePoolProgramId, stakePoolPubkey),
+      stakeAvailableToWithdraw(
+        validator,
+        stakePoolProgramId,
+        stakePoolPubkey,
+        stakePoolHasActive,
+      ),
     ),
   );
   const res: ValidatorWithdrawalReceipt[] = [];
@@ -262,6 +270,8 @@ const STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS = new Numberu64(2_282_880);
  * @param validator `ValidatorStakeInfo` for the validator
  * @param stakePoolProgramId
  * @param stakePoolPubkey
+ * @param stakePoolHasActive true if stake pool has at least one active stake, false otherwise.
+ *                           If true, can only withdraw from the active stake account, not transient.
  * @returns
  * - lamports available for withdrawal
  * - pubkey of the stake account to withdraw from
@@ -270,10 +280,8 @@ async function stakeAvailableToWithdraw(
   validator: ValidatorStakeInfo,
   stakePoolProgramId: PublicKey,
   stakePoolPubkey: PublicKey,
+  stakePoolHasActive: boolean,
 ): Promise<ValidatorStakeAvailableToWithdraw> {
-  // must withdraw from active stake account if active stake account has non-zero balance
-  const hasActive = !validator.activeStakeLamports.isZero(); // false if validator is newly added
-  // const hasTransient = !validator.transientStakeLamports.isZero();
   // this is fucking stupid but
   // `transientStakeLamports` = rent exempt reserve + delegation.stake, whereas
   // `activeStakeLamports` = delegation.stake - MIN_ACTIVE_STAKE_LAMPORTS.
@@ -288,12 +296,7 @@ async function stakeAvailableToWithdraw(
   const transientWithdrawableLamports = Numberu64.cloneFromBN(
     validator.transientStakeLamports,
   ).satSub(transientUnwithdrawableLamports);
-  const transientStakeAccount = await getValidatorTransientStakeAccount(
-    stakePoolProgramId,
-    stakePoolPubkey,
-    validator.voteAccountAddress,
-  );
-  const [lamports, stakeAccount] = hasActive
+  const [lamports, stakeAccount] = stakePoolHasActive
     ? [
         activeWithdrawableLamports,
         await getValidatorStakeAccount(
@@ -302,7 +305,14 @@ async function stakeAvailableToWithdraw(
           validator.voteAccountAddress,
         ),
       ]
-    : [transientWithdrawableLamports, transientStakeAccount];
+    : [
+        transientWithdrawableLamports,
+        await getValidatorTransientStakeAccount(
+          stakePoolProgramId,
+          stakePoolPubkey,
+          validator.voteAccountAddress,
+        ),
+      ];
   return { lamports, stakeAccount };
 }
 
