@@ -50,12 +50,12 @@ export class SoceanConfig {
       default:
         throw new Error("clusterType must be specified");
     }
-    if (connectionOption instanceof Connection) {
-      this.connection = connectionOption;
-    } else {
+    if (!connectionOption || typeof connectionOption === "string") {
       this.connection = new Connection(
         connectionOption ?? clusterApiUrl(clusterType),
       );
+    } else {
+      this.connection = connectionOption;
     }
   }
 }
