@@ -45,8 +45,14 @@ export class WalletPublicKeyUnavailableError extends Error {
   }
 }
 
+export class StakeAccountToDepositInvalidError extends Error {
+  constructor(public readonly reason: string = "") {
+    super(`Stake account to deposit is invalid: ${reason}`);
+  }
+}
+
 /// **
-// * Error class reprensenting a partially-filled withdraw-stake operation
+// * Error class representing a partially-filled withdraw-stake operation
 // */
 // export class PartialWithdrawalError extends Error {
 //  completedTransactions: TransactionSignature[];

@@ -22,6 +22,7 @@ import {
   StakePoolInstruction,
   ValidatorAllStakeAccounts,
 } from "@/stake-pool/types";
+
 /**
  * Initializes a DepositSol stake pool instruction given the required accounts and data
  *
@@ -98,6 +99,82 @@ export const depositSolInstruction = (
     data,
   });
 };
+
+/**
+ * Initializes a DepositStake stake pool instruction given the required accounts and data
+ * @param stakePoolProgramId: Pubkey of the stake pool program
+ * @param stakePool: Pubkey of the stake pool to deposit to
+ * @param validatorList: Pubkey of the stake pool's validator list.
+ * @param stakePoolDepositAuthority: Pubkey of the stake pool's deposit authority.
+ *                                   Either default PDA stake deposit authority or custom deposit authority.
+ * @param stakePoolWithdrawAuthority: Pubkey of the stake pool's withdraw authority.
+ *                                    PDA of the stake pool program, see StakePool docs for details.
+ * @param depositStakeAddress: Pubkey of the stake account to be deposited.
+ * @param validatorStakeAccount: Pubkey of the stake pool's stake account for the validator of the `depostStakeAddress` stake account.
+ * @param reserveStake: Pubkey of the stake pool's reserve account
+ * @param poolTokensTo: Pubkey of the pool token account to mint the pool tokens to.
+ * @param managerFeeAccount: Pubkey of the pool token account receiving the stake pool's fees.
+ * @param referrerPoolTokensAccount: Pubkey of the pool token account of the referrer to receive referral fees
+ * @param poolMint: Pubkey of the pool token mint
+ * @param tokenProgramId: Pubkey of the SPL token program
+ */
+export function depositStakeInstruction(
+  stakePoolProgramId: PublicKey,
+  stakePool: PublicKey,
+  validatorList: PublicKey,
+  stakePoolDepositAuthority: PublicKey,
+  stakePoolWithdrawAuthority: PublicKey,
+  depositStakeAddress: PublicKey,
+  validatorStakeAccount: PublicKey,
+  reserveStake: PublicKey,
+  poolTokensTo: PublicKey,
+  managerFeeAccount: PublicKey,
+  referrerPoolTokensAccount: PublicKey,
+  poolMint: PublicKey,
+  tokenProgramId: PublicKey,
+): TransactionInstruction {
+  const dataLayout = struct<{ instruction: number }>([u8("instruction")]);
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: StakePoolInstruction.DepositStake,
+    },
+    data,
+  );
+
+  const keys = [
+    { pubkey: stakePool, isSigner: false, isWritable: true },
+    {
+      pubkey: validatorList,
+      isSigner: false,
+      isWritable: true,
+    },
+    {
+      pubkey: stakePoolDepositAuthority,
+      isSigner: false,
+      isWritable: false,
+    },
+    { pubkey: stakePoolWithdrawAuthority, isSigner: false, isWritable: false },
+    { pubkey: depositStakeAddress, isSigner: false, isWritable: true },
+    { pubkey: validatorStakeAccount, isSigner: false, isWritable: true },
+    { pubkey: reserveStake, isSigner: false, isWritable: true },
+    { pubkey: poolTokensTo, isSigner: false, isWritable: true },
+    { pubkey: managerFeeAccount, isSigner: false, isWritable: true },
+    { pubkey: referrerPoolTokensAccount, isSigner: false, isWritable: true },
+    { pubkey: poolMint, isSigner: false, isWritable: true },
+    { pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false },
+    { pubkey: SYSVAR_STAKE_HISTORY_PUBKEY, isSigner: false, isWritable: false },
+    { pubkey: tokenProgramId, isSigner: false, isWritable: false },
+    { pubkey: StakeProgram.programId, isSigner: false, isWritable: false },
+  ];
+
+  return new TransactionInstruction({
+    keys,
+    programId: stakePoolProgramId,
+    data,
+  });
+}
 
 /**
  * Initializes a WithdrawStake stake pool instruction given the required accounts and data
