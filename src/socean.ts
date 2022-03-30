@@ -11,6 +11,7 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  StakeProgram,
   Transaction,
 } from "@solana/web3.js";
 import BN from "bn.js";
@@ -19,6 +20,7 @@ import { signAndSendTransactionSequence } from "@/socean";
 import { ClusterType, SoceanConfig } from "@/socean/config";
 import {
   AccountDoesNotExistError,
+  StakeAccountToDepositInvalidError,
   WalletPublicKeyUnavailableError,
 } from "@/socean/err";
 import {
@@ -31,9 +33,11 @@ import {
 import {
   cleanupRemovedValidatorsInstruction,
   depositSolInstruction,
+  depositStakeInstruction,
   updateStakePoolBalanceInstruction,
   updateValidatorListBalanceTransaction,
 } from "@/stake-pool/instructions";
+import { ParsedStakeAccount } from "@/stake-pool/stakeAccount";
 import {
   Numberu64,
   StakePoolAccount,
@@ -141,6 +145,144 @@ export class Socean {
       stakePool.account.data.poolMint,
       TOKEN_PROGRAM_ID,
       amountLamports,
+    );
+    tx.add(ix);
+    const transactionSequence: TransactionSequence = [
+      [
+        {
+          tx,
+          signers: [],
+        },
+      ],
+    ];
+
+    const currEpoch = await this.getCurrentEpoch();
+    if (stakePool.account.data.lastUpdateEpoch.lt(new BN(currEpoch))) {
+      const validatorListAcc = await this.getValidatorListAccount(
+        stakePool.account.data.validatorList,
+      );
+      const updateTxSeq = await this.updateTransactionSequence(
+        stakePool,
+        validatorListAcc,
+      );
+      transactionSequence.unshift(...updateTxSeq);
+    }
+    return transactionSequence;
+  }
+
+  /**
+   * Signs, sends and confirms the transactions required to deposit a stake account
+   * into the Socean stake pool
+   * @param walletAdapter SOL wallet to deposit SOL from
+   * @param stakeAccount The stake account to deposit.
+   *                     Must be active and delegated to a validator in the stake pool.
+   *                     The entire stake account is deposited. To deposit only a portion of it, prefix this instruction
+   *                     with a stake split instruction and deposit the stake account that's split off instead.
+   * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
+   * @param confirmOptions transaction confirm options for each transaction
+   * @returns the transaction signatures of the transactions sent and confirmed
+   * @throws RpcError
+   * @throws AccountDoesNotExistError if stake pool or main validator stake account for `stakeAccount`'s validator does not exist
+   * @throws WalletPublicKeyUnavailableError
+   * @throws StakeAccountToDepositInvalidError if stake account to deposit does not meet deposit requirements
+   */
+  async depositStake(
+    walletAdapter: WalletAdapter,
+    stakeAccount: PublicKey,
+    referrerPoolTokenAccount?: PublicKey,
+    confirmOptions: ConfirmOptions = TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS,
+  ): Promise<TransactionSequenceSignatures> {
+    const walletPubkey = walletAdapter.publicKey;
+    if (!walletPubkey) throw new WalletPublicKeyUnavailableError();
+    const txSeq = await this.depositStakeTransactions(
+      walletPubkey,
+      stakeAccount,
+      referrerPoolTokenAccount,
+    );
+    return this.signAndSend(walletAdapter, txSeq, confirmOptions);
+  }
+
+  /**
+   * Creates a `TransactionSequence` that deposits an active stake account currently staked
+   * with one of the Socean stake pool's validators into Socean stake pool
+   * Each inner `TransactionWithSigners` array must be executed and confirmed
+   * before going to the next one.
+   * This is a lower-level API for compatibility, recommend using `depositStake()` instead if possible.
+   * @param walletPubkey SOL wallet to deposit SOL from
+   * @param stakeAccount The stake account to deposit.
+   *                     Must be active and delegated to a validator in the stake pool.
+   *                     The entire stake account is deposited. To deposit only a portion of it, prefix this instruction
+   *                     with a stake split instruction and deposit the stake account that's split off instead.
+   * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
+   * @returns the deposit transaction sequence
+   * @throws RpcError
+   * @throws AccountDoesNotExistError if stake pool or main validator stake account for `stakeAccount`'s validator does not exist
+   * @throws StakeAccountToDepositInvalidError if stake account to deposit does not meet deposit requirements
+   */
+  async depositStakeTransactions(
+    walletPubkey: PublicKey,
+    stakeAccount: PublicKey,
+    referrerPoolTokenAccount?: PublicKey,
+  ): Promise<TransactionSequence> {
+    const { value } = await this.config.connection.getParsedAccountInfo(
+      stakeAccount,
+    );
+    if (!value)
+      throw new StakeAccountToDepositInvalidError(
+        "stake account does not exist",
+      );
+    if (
+      value.data instanceof Buffer ||
+      !value.owner.equals(StakeProgram.programId)
+    )
+      throw new StakeAccountToDepositInvalidError("not a stake account");
+    const stakeAccountInfo: ParsedStakeAccount = value.data.parsed;
+    if (!stakeAccountInfo.info.stake.delegation.voter)
+      throw new StakeAccountToDepositInvalidError(
+        "stake account not delegated",
+      );
+    const voteAcc = new PublicKey(stakeAccountInfo.info.stake.delegation.voter);
+    const vsa = await getValidatorStakeAccount(
+      this.config.stakePoolProgramId,
+      this.config.stakePoolAccountPubkey,
+      voteAcc,
+    );
+    const { value: vsaAcc } = await this.config.connection.getParsedAccountInfo(
+      vsa,
+    );
+    if (!vsaAcc) throw new AccountDoesNotExistError(vsa);
+
+    const stakePool = await this.getStakePoolAccount();
+
+    const tx = new Transaction();
+
+    // get associated token account for scnSOL, if not exist create one
+    const poolTokenTo = await getOrCreateAssociatedAddress(
+      this.config.connection,
+      stakePool.account.data.poolMint,
+      walletPubkey,
+      tx,
+    );
+
+    const stakePoolWithdrawAuthority = await getWithdrawAuthority(
+      this.config.stakePoolProgramId,
+      this.config.stakePoolAccountPubkey,
+    );
+
+    const ix = depositStakeInstruction(
+      this.config.stakePoolProgramId,
+      this.config.stakePoolAccountPubkey,
+      stakePool.account.data.validatorList,
+      stakePool.account.data.depositAuthority,
+      stakePoolWithdrawAuthority,
+      stakeAccount,
+      vsa,
+      stakePool.account.data.reserveStake,
+      poolTokenTo,
+      stakePool.account.data.managerFeeAccount,
+      referrerPoolTokenAccount ?? stakePool.account.data.managerFeeAccount,
+      stakePool.account.data.poolMint,
+      TOKEN_PROGRAM_ID,
     );
     tx.add(ix);
     const transactionSequence: TransactionSequence = [
