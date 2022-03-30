@@ -182,7 +182,7 @@ export class Socean {
    * @param confirmOptions transaction confirm options for each transaction
    * @returns the transaction signatures of the transactions sent and confirmed
    * @throws RpcError
-   * @throws AccountDoesNotExistError if stake pool does not exist
+   * @throws AccountDoesNotExistError if stake pool or main validator stake account for `stakeAccount`'s validator does not exist
    * @throws WalletPublicKeyUnavailableError
    * @throws StakeAccountToDepositInvalidError if stake account to deposit does not meet deposit requirements
    */
@@ -216,7 +216,7 @@ export class Socean {
    * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
    * @returns the deposit transaction sequence
    * @throws RpcError
-   * @throws AccountDoesNotExistError if stake pool does not exist
+   * @throws AccountDoesNotExistError if stake pool or main validator stake account for `stakeAccount`'s validator does not exist
    * @throws StakeAccountToDepositInvalidError if stake account to deposit does not meet deposit requirements
    */
   async depositStakeTransactions(
@@ -247,6 +247,10 @@ export class Socean {
       this.config.stakePoolAccountPubkey,
       voteAcc,
     );
+    const { value: vsaAcc } = await this.config.connection.getParsedAccountInfo(
+      vsa,
+    );
+    if (!vsaAcc) throw new AccountDoesNotExistError(vsa);
 
     const stakePool = await this.getStakePoolAccount();
 
