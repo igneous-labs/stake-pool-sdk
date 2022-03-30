@@ -177,13 +177,14 @@ export class Socean {
    * @param stakeAccount The stake account to deposit.
    *                     Must be active and delegated to a validator in the stake pool.
    *                     The entire stake account is deposited. To deposit only a portion of it, prefix this instruction
-   *                     with a stake split instruction and deposit the stake account that's split off.
+   *                     with a stake split instruction and deposit the stake account that's split off instead.
    * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
    * @param confirmOptions transaction confirm options for each transaction
    * @returns the transaction signatures of the transactions sent and confirmed
    * @throws RpcError
    * @throws AccountDoesNotExistError if stake pool does not exist
    * @throws WalletPublicKeyUnavailableError
+   * @throws StakeAccountToDepositInvalidError if stake account to deposit does not meet deposit requirements
    */
   async depositStake(
     walletAdapter: WalletAdapter,
@@ -211,7 +212,7 @@ export class Socean {
    * @param stakeAccount The stake account to deposit.
    *                     Must be active and delegated to a validator in the stake pool.
    *                     The entire stake account is deposited. To deposit only a portion of it, prefix this instruction
-   *                     with a stake split instruction and deposit the stake account that's split off.
+   *                     with a stake split instruction and deposit the stake account that's split off instead.
    * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
    * @returns the deposit transaction sequence
    * @throws RpcError
