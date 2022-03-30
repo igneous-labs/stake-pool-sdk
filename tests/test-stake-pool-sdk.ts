@@ -10,6 +10,7 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
 } from "@solana/web3.js";
+import assert from "assert";
 import { expect } from "chai";
 
 import {
@@ -62,6 +63,43 @@ describe("test basic functionalities", () => {
       referrer.publicKey,
     );
     console.log(JSON.stringify(tx, null, 4));
+  });
+
+  it("it generates deposit stake tx", async () => {
+    const socean = new Socean();
+    const staker = Keypair.generate();
+    const referrer = Keypair.generate();
+    // this is an active stake acc owned by B2iHXo4KLEBx5Cm8jjrdpj6BsCjbzLFZxAf7BDqJ3y7y
+    const testnetStakeAcc = new PublicKey(
+      "Ch1rDUSoRNzQMAjQSwsjwsRJJmYFZBBJfUFsTuKezkXD",
+    );
+
+    const tx = await socean.depositStakeTransactions(
+      staker.publicKey,
+      testnetStakeAcc,
+      referrer.publicKey,
+    );
+    console.log(JSON.stringify(tx, null, 4));
+  });
+
+  it("fails deposit stake tx invalid stake account", async () => {
+    const socean = new Socean();
+    const staker = Keypair.generate();
+    const referrer = Keypair.generate();
+    const invalidStakeAcc = Keypair.generate();
+
+    await assert.rejects(
+      async () => {
+        await socean.depositStakeTransactions(
+          staker.publicKey,
+          invalidStakeAcc.publicKey,
+          referrer.publicKey,
+        );
+      },
+      {
+        reason: "stake account does not exist",
+      },
+    );
   });
 
   it("it generates withdraw txs", async () => {
