@@ -629,18 +629,18 @@ function calcDeposit(
   };
 }
 
-export function calcDepositInverse(
+function calcDepositInverse(
   dropletsToReceive: Numberu64,
   stakePool: schema.StakePool,
   depositFee: schema.Fee,
   referralFee: number,
 ): DepositReceipt {
   // dropletsMinted = dropletsToReceive / (1 - depositFee)
-  const dropletsMinted = dropletsToReceive.div(
-    Numberu64.cloneFromBN(depositFee.denominator.sub(depositFee.numerator)).div(
-      depositFee.denominator,
-    ),
-  );
+  const dropletsMinted = dropletsToReceive
+    .mul(depositFee.denominator)
+    .div(
+      Numberu64.cloneFromBN(depositFee.denominator.sub(depositFee.numerator)),
+    );
 
   const lamportsToStake = Numberu64.cloneFromBN(
     dropletsMinted
