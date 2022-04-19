@@ -18,7 +18,7 @@ export {
 } from "@/socean/transactions";
 export {
   calcSolDeposit,
-  calcDepositInverse,
+  calcSolDepositInverse,
   calcStakeDeposit,
   calcWithdrawals,
   totalWithdrawLamports,

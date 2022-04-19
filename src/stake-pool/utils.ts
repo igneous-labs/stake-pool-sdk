@@ -690,6 +690,18 @@ export function calcSolDeposit(
   );
 }
 
+export function calcSolDepositInverse(
+  dropletsToReceive: Numberu64,
+  stakePool: schema.StakePool,
+): DepositReceipt {
+  return calcDepositInverse(
+    dropletsToReceive,
+    stakePool,
+    stakePool.solDepositFee,
+    stakePool.solReferralFee,
+  );
+}
+
 /**
  * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
  * by the user for staking stake account(s), with deposit fees factored in.
