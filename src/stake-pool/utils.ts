@@ -671,12 +671,6 @@ export async function getDefaultDepositAuthority(
   return key;
 }
 
-function ceilDiv(numerator: Numberu64, denominator: Numberu64): Numberu64 {
-  return Numberu64.cloneFromBN(
-    numerator.add(denominator).sub(new Numberu64(1)).div(denominator),
-  );
-}
-
 /**
  * Helper function for calculating expected droplets given a deposit and the deposit fee struct.
  * Mirrors on-chain math exactly.
@@ -813,6 +807,15 @@ export function calcStakeDeposit(
   );
 }
 
+export function ceilDiv(
+  numerator: Numberu64,
+  denominator: Numberu64,
+): Numberu64 {
+  return Numberu64.cloneFromBN(
+    numerator.add(denominator).sub(new Numberu64(1)).div(denominator),
+  );
+}
+
 /**
  * Helper function for calculating expected lamports given the amount of droplets to withdraw.
  * Mirrors on-chain math exactly.
@@ -851,9 +854,8 @@ function calcWithdrawalReceipt(
   }
   // on-chain logic is ceil div
   // overflow safety: 1 < num + poolTokenSupply
-  const lamportsReceived = ceilDiv(
-    Numberu64.cloneFromBN(num),
-    Numberu64.cloneFromBN(poolTokenSupply),
+  const lamportsReceived = Numberu64.cloneFromBN(
+    num.add(poolTokenSupply).sub(new Numberu64(1)).div(poolTokenSupply),
   );
 
   return {
