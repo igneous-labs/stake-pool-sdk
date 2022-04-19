@@ -144,29 +144,6 @@ describe("test basic functionalities", () => {
     }
   });
 
-  it("it calcSolDeposit() and calcSolDepositsInverse() works correctly", async () => {
-    const socean = new Socean("testnet");
-    const stakePool = await socean.getStakePoolAccount();
-
-    const depositAmountSol = Math.random() / 4;
-    const depositAmount = Math.round(depositAmountSol * LAMPORTS_PER_SOL);
-    const depositAmountLamports = new Numberu64(depositAmount);
-    const { dropletsReceived } = calcSolDeposit(
-      depositAmountLamports,
-      stakePool.account.data,
-    );
-
-    const { lamportsStaked } = calcSolDepositInverse(
-      dropletsReceived,
-      stakePool.account.data,
-    );
-
-    console.log("lamportsStaked: ", lamportsStaked.toNumber());
-    console.log("depositAmount: ", depositAmountLamports.toNumber());
-
-    expect(lamportsStaked.toNumber()).to.eq(depositAmountLamports.toNumber());
-  });
-
   describe("testnet executions", () => {
     let connection: Connection;
     let stakerKeypair: Keypair;
@@ -199,6 +176,33 @@ describe("test basic functionalities", () => {
         TOKEN_PROGRAM_ID,
         scnSolMintPubkey,
         staker.publicKey,
+      );
+    });
+
+    it("it calcSolDeposit() and calcSolDepositsInverse() works correctly", async () => {
+      const socean = new Socean("testnet");
+      const stakePool = await socean.getStakePoolAccount();
+
+      const depositAmountSol = Math.random() / 4;
+      const depositAmount = Math.round(depositAmountSol * LAMPORTS_PER_SOL);
+      const depositAmountLamports = new Numberu64(depositAmount);
+      const { dropletsReceived, dropletsFeePaid, referralFeePaid } =
+        calcSolDeposit(depositAmountLamports, stakePool.account.data);
+
+      const {
+        lamportsStaked,
+        dropletsFeePaid: inverseDropletsFeePaid,
+        referralFeePaid: inverseReferralFeePaid,
+      } = calcSolDepositInverse(dropletsReceived, stakePool.account.data);
+
+      expect(
+        depositAmountLamports.toNumber() - lamportsStaked.toNumber(),
+      ).to.be.at.most(2);
+      expect(dropletsFeePaid.toNumber()).to.eq(
+        inverseDropletsFeePaid.toNumber(),
+      );
+      expect(referralFeePaid.toNumber()).to.eq(
+        inverseReferralFeePaid.toNumber(),
       );
     });
 
