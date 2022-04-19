@@ -15,6 +15,7 @@ import { expect } from "chai";
 
 import {
   calcSolDeposit,
+  calcSolDepositInverse,
   calcWithdrawals,
   Socean,
   totalWithdrawLamports,
@@ -141,6 +142,29 @@ describe("test basic functionalities", () => {
       console.log("Updated this epoch, transactions should not have updates");
       expect(txs.length).to.eq(1);
     }
+  });
+
+  it("it calcSolDeposit() and calcSolDepositsInverse() works correctly", async () => {
+    const socean = new Socean("testnet");
+    const stakePool = await socean.getStakePoolAccount();
+
+    const depositAmountSol = Math.random() / 4;
+    const depositAmount = Math.round(depositAmountSol * LAMPORTS_PER_SOL);
+    const depositAmountLamports = new Numberu64(depositAmount);
+    const { dropletsReceived } = calcSolDeposit(
+      depositAmountLamports,
+      stakePool.account.data,
+    );
+
+    const { lamportsStaked } = calcSolDepositInverse(
+      dropletsReceived,
+      stakePool.account.data,
+    );
+
+    console.log("lamportsStaked: ", lamportsStaked.toNumber());
+    console.log("depositAmount: ", depositAmountLamports.toNumber());
+
+    expect(lamportsStaked.toNumber()).to.eq(depositAmountLamports.toNumber());
   });
 
   describe("testnet executions", () => {
