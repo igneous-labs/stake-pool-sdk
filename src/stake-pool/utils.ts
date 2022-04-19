@@ -629,6 +629,46 @@ function calcDeposit(
   };
 }
 
+export function calcDepositInverse(
+  dropletsToReceive: Numberu64,
+  stakePool: schema.StakePool,
+  depositFee: schema.Fee,
+  referralFee: number,
+): DepositReceipt {
+  // dropletsMinted = dropletsToReceive / (1 - depositFee)
+  const dropletsMinted = dropletsToReceive.div(
+    Numberu64.cloneFromBN(depositFee.denominator.sub(depositFee.numerator)).div(
+      depositFee.denominator,
+    ),
+  );
+
+  const lamportsToStake = Numberu64.cloneFromBN(
+    dropletsMinted
+      .mul(stakePool.totalStakeLamports)
+      .div(stakePool.poolTokenSupply),
+  );
+
+  const hasFee =
+    !depositFee.numerator.isZero() && !depositFee.denominator.isZero();
+
+  const dropletsFeePaid = hasFee
+    ? Numberu64.cloneFromBN(
+        depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator),
+      )
+    : new Numberu64(0);
+
+  const referralFeePaid = Numberu64.cloneFromBN(
+    dropletsFeePaid.mul(new BN(referralFee)).div(new BN(100)),
+  );
+
+  return {
+    lamportsStaked: lamportsToStake,
+    dropletsReceived: dropletsToReceive,
+    dropletsFeePaid,
+    referralFeePaid,
+  };
+}
+
 /**
  * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
  * by the user for staking SOL, with deposit fees factored in.
