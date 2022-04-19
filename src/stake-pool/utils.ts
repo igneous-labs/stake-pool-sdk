@@ -242,6 +242,90 @@ export async function calcWithdrawals(
   return res;
 }
 
+export async function calcWithdrawalsInverse(
+  withdrawalAmountLamports: Numberu64,
+  stakePoolAccount: StakePoolAccount,
+  validatorList: ValidatorList,
+): Promise<ValidatorWithdrawalReceipt[]> {
+  const {
+    publicKey: stakePoolPubkey,
+    account: { data: stakePool, owner: stakePoolProgramId },
+  } = stakePoolAccount;
+  const { validators } = validatorList;
+  // no active validators, withdraw from reserve
+  // also, reduce() throws error if array empty
+  if (validators.length < 1)
+    return [
+      {
+        stakeAccount: stakePool.reserveStake,
+        withdrawalReceipt: calcWithdrawalReceiptInverse(
+          withdrawalAmountLamports,
+          stakePool,
+        ),
+      },
+    ];
+
+  const stakePoolHasActive = validators.some(
+    (info) => !info.activeStakeLamports.isZero(),
+  );
+  const sortedValidators = validatorsByTotalStakeAsc(validators);
+  const validatorStakeAvailableToWithdraw = await Promise.all(
+    sortedValidators.map((validator) =>
+      stakeAvailableToWithdraw(
+        validator,
+        stakePoolProgramId,
+        stakePoolPubkey,
+        stakePoolHasActive,
+      ),
+    ),
+  );
+  const res: ValidatorWithdrawalReceipt[] = [];
+
+  let dropletsRemaining = calcWithdrawalReceiptInverse(
+    withdrawalAmountLamports,
+    stakePool,
+  ).dropletsUnstaked;
+
+  // Withdraw from the lightest validators first
+  validatorStakeAvailableToWithdraw.forEach(({ lamports, stakeAccount }) => {
+    if (dropletsRemaining.isZero()) {
+      return;
+    }
+    const withdrawalReceipt = tryServiceWithdrawal(
+      dropletsRemaining,
+      lamports,
+      stakePool,
+    );
+    if (
+      !withdrawalReceipt.dropletsUnstaked.isZero() &&
+      !withdrawalReceipt.lamportsReceived.isZero()
+    ) {
+      res.push({
+        stakeAccount,
+        withdrawalReceipt,
+      });
+      dropletsRemaining = dropletsRemaining.satSub(
+        withdrawalReceipt.dropletsUnstaked,
+      );
+    }
+  });
+
+  // might happen if many transient stake accounts
+  if (!dropletsRemaining.isZero()) {
+    // Cannot proceed directly to transient stake accounts
+    // even if main stake account is exhausted because of
+    // MIN_ACTIVE_LAMPORTS.
+    // Cannot proceed directly to the reserves
+    // unless absolutely all stake accounts (main and transient) are deleted
+    // and you can only delete a main stake account with RemoveValidator instruction
+    throw new WithdrawalUnserviceableError(
+      "Too many transient stake accounts, please try again with a smaller withdraw amount or on the next epoch",
+    );
+  }
+
+  return res;
+}
+
 function validatorsByTotalStakeAsc(
   validatorStakeInfos: ValidatorStakeInfo[],
 ): ValidatorStakeInfo[] {
@@ -587,6 +671,12 @@ export async function getDefaultDepositAuthority(
   return key;
 }
 
+function ceilDiv(numerator: Numberu64, denominator: Numberu64): Numberu64 {
+  return Numberu64.cloneFromBN(
+    numerator.add(denominator).sub(new Numberu64(1)).div(denominator),
+  );
+}
+
 /**
  * Helper function for calculating expected droplets given a deposit and the deposit fee struct.
  * Mirrors on-chain math exactly.
@@ -761,12 +851,51 @@ function calcWithdrawalReceipt(
   }
   // on-chain logic is ceil div
   // overflow safety: 1 < num + poolTokenSupply
-  const lamportsReceived = Numberu64.cloneFromBN(
-    num.add(poolTokenSupply).sub(new Numberu64(1)).div(poolTokenSupply),
+  const lamportsReceived = ceilDiv(
+    Numberu64.cloneFromBN(num),
+    Numberu64.cloneFromBN(poolTokenSupply),
   );
+
   return {
     dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
     lamportsReceived,
+    dropletsFeePaid,
+  };
+}
+
+function calcWithdrawalReceiptInverse(
+  lamportsToReceive: Numberu64,
+  stakePool: schema.StakePool,
+): WithdrawalReceipt {
+  const { withdrawalFee, totalStakeLamports, poolTokenSupply } = stakePool;
+
+  // If poolTokenSupply == 0, then below values should all be 0 as well.
+
+  const dropletsBurnt = lamportsToReceive
+    .mul(poolTokenSupply)
+    .div(totalStakeLamports);
+
+  const dropletsToUnstake = dropletsBurnt
+    .mul(withdrawalFee.denominator)
+    .div(
+      Numberu64.cloneFromBN(
+        withdrawalFee.denominator.sub(withdrawalFee.numerator),
+      ),
+    );
+
+  const hasFee =
+    !withdrawalFee.numerator.isZero() && !withdrawalFee.denominator.isZero();
+  const dropletsFeePaid = hasFee
+    ? Numberu64.cloneFromBN(
+        withdrawalFee.numerator
+          .mul(dropletsToUnstake)
+          .div(withdrawalFee.denominator),
+      )
+    : new Numberu64(0);
+
+  return {
+    dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
+    lamportsReceived: lamportsToReceive,
     dropletsFeePaid,
   };
 }

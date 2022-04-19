@@ -21,6 +21,7 @@ export {
   calcSolDepositInverse,
   calcStakeDeposit,
   calcWithdrawals,
+  calcWithdrawalsInverse,
   totalWithdrawLamports,
   totalWithdrawalFeesDroplets,
 } from "@/stake-pool/utils";
