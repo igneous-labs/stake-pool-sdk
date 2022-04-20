@@ -19,7 +19,7 @@ import {
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
-import { BN } from "bn.js";
+import BN from "bn.js";
 
 import { RpcError, WithdrawalUnserviceableError } from "@/socean/err";
 import { TransactionWithSigners } from "@/socean/transactions";
@@ -738,10 +738,7 @@ export function calcStakeDeposit(
   );
 }
 
-export function ceilDiv(
-  numerator: Numberu64,
-  denominator: Numberu64,
-): Numberu64 {
+export function ceilDiv(numerator: BN, denominator: BN): Numberu64 {
   return Numberu64.cloneFromBN(
     numerator.add(denominator).sub(new Numberu64(1)).div(denominator),
   );
@@ -785,9 +782,11 @@ function calcWithdrawalReceipt(
   }
   // on-chain logic is ceil div
   // overflow safety: 1 < num + poolTokenSupply
-  const lamportsReceived = Numberu64.cloneFromBN(
-    num.add(poolTokenSupply).sub(new Numberu64(1)).div(poolTokenSupply),
-  );
+  // const lamportsReceived = Numberu64.cloneFromBN(
+  //   num.add(poolTokenSupply).sub(new Numberu64(1)).div(poolTokenSupply),
+  // );
+
+  const lamportsReceived = ceilDiv(num, poolTokenSupply);
 
   return {
     dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
