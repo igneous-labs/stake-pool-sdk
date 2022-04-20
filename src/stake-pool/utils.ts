@@ -809,7 +809,6 @@ function calcWithdrawalReceiptInverse(
   const { withdrawalFee, totalStakeLamports, poolTokenSupply } = stakePool;
 
   // If poolTokenSupply == 0, then below values should all be 0 as well.
-
   const dropletsBurnt = lamportsToReceive
     .mul(poolTokenSupply)
     .div(totalStakeLamports);
@@ -825,20 +824,14 @@ function calcWithdrawalReceiptInverse(
             withdrawalFee.denominator.sub(withdrawalFee.numerator),
           ),
         )
-    : new Numberu64(0);
+    : dropletsBurnt;
 
-  const dropletsFeePaid = hasFee
-    ? Numberu64.cloneFromBN(
-        withdrawalFee.numerator
-          .mul(dropletsToUnstake)
-          .div(withdrawalFee.denominator),
-      )
-    : new Numberu64(0);
+  const dropletsFeePaid = dropletsToUnstake.sub(dropletsBurnt);
 
   return {
     dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
     lamportsReceived: lamportsToReceive,
-    dropletsFeePaid,
+    dropletsFeePaid: Numberu64.cloneFromBN(dropletsFeePaid),
   };
 }
 
