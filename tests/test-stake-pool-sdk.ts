@@ -17,6 +17,7 @@ import {
   calcSolDeposit,
   calcSolDepositInverse,
   calcWithdrawals,
+  calcWithdrawalsInverse,
   Socean,
   totalWithdrawLamports,
 } from "@/socean";
@@ -203,6 +204,54 @@ describe("test basic functionalities", () => {
       );
       expect(referralFeePaid.toNumber()).to.eq(
         inverseReferralFeePaid.toNumber(),
+      );
+    });
+
+    it("it calcWithdrawals() and calcWithdrawalsInverse() works correctly", async () => {
+      const socean = new Socean("testnet");
+      const stakePool = await socean.getStakePoolAccount();
+      const validatorList = await socean.getValidatorListAccount(
+        stakePool.account.data.validatorList,
+      );
+      const scnSolAtaAcctInfo = await scnSolToken.getAccountInfo(
+        scnSolAtaPubkey,
+      );
+      const initialBalanceDroplets = scnSolAtaAcctInfo.amount;
+
+      const withdrawAmountDroplets = new Numberu64(
+        Math.round(Math.random() * initialBalanceDroplets.toNumber()),
+      );
+
+      const validatorWithdrawalReceipts = await calcWithdrawals(
+        withdrawAmountDroplets,
+        stakePool,
+        validatorList.account.data,
+      );
+
+      let totalLamportsReceived: Numberu64 = new Numberu64(0);
+      validatorWithdrawalReceipts.forEach((receipt) => {
+        totalLamportsReceived = Numberu64.cloneFromBN(
+          totalLamportsReceived.add(receipt.withdrawalReceipt.lamportsReceived),
+        );
+      });
+
+      const validatorWithdrawalReceiptsInverse = await calcWithdrawalsInverse(
+        totalLamportsReceived,
+        stakePool,
+        validatorList.account.data,
+      );
+
+      let totalDropletsToUnstake: Numberu64 = new Numberu64(0);
+      validatorWithdrawalReceiptsInverse.forEach((receipt) => {
+        totalDropletsToUnstake = Numberu64.cloneFromBN(
+          totalDropletsToUnstake.add(
+            receipt.withdrawalReceipt.dropletsUnstaked,
+          ),
+        );
+      });
+
+      expect(totalDropletsToUnstake.toNumber()).to.eq(
+        withdrawAmountDroplets.toNumber(),
       );
     });
 

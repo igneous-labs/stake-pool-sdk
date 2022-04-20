@@ -254,13 +254,7 @@ export async function calcWithdrawalsInverse(
     withdrawalAmountLamports,
     stakePool,
   );
-  const res = await calcWithdrawals(
-    dropletsUnstaked,
-    stakePoolAccount,
-    validatorList,
-  );
-
-  return res;
+  return calcWithdrawals(dropletsUnstaked, stakePoolAccount, validatorList);
 }
 
 function validatorsByTotalStakeAsc(
