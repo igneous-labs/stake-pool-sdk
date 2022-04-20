@@ -1,3 +1,4 @@
+/*
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   Token,
@@ -11,8 +12,6 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 import assert from "assert";
-import { expect } from "chai";
-
 import {
   calcSolDeposit,
   calcSolDepositInverse,
@@ -21,13 +20,37 @@ import {
   Socean,
   totalWithdrawLamports,
 } from "@/socean";
-import { Numberu64 } from "@/stake-pool/types";
 import {
   cleanupAllStakeAccs,
   getStakeAccounts,
   MockWalletAdapter,
   prepareStaker,
 } from "@/tests/utils";
+*/
+
+import BN from "bn.js";
+import { expect } from "chai";
+
+import { Numberu64 } from "@/stake-pool/types";
+
+describe("test Numberu64", () => {
+  it("ceilDiv works for both BN and Numberu64", () => {
+    const n1 = Math.round(Number.MAX_SAFE_INTEGER * Math.random());
+    const n2 = Math.round(Number.MAX_SAFE_INTEGER * Math.random());
+    const bn1 = new BN(n1);
+    const bn2 = new BN(n2);
+    const n641 = Numberu64.cloneFromBN(bn1);
+    const n642 = Numberu64.cloneFromBN(bn2);
+    const one = new BN(1);
+    const ceilDivBN = bn1.add(bn2).sub(one).div(bn2);
+    const ceilDiv = n641.ceilDiv(n642);
+    const ceilDivWithBN = n641.ceilDiv(bn2);
+    expect(ceilDivBN.toString()).to.eq(ceilDiv.toString());
+    expect(ceilDiv.toString()).to.eq(ceilDivWithBN.toString());
+  });
+});
+
+/*
 
 describe("test basic functionalities", () => {
   it("it initializes and gets stake pool account", async () => {
@@ -414,3 +437,4 @@ describe("test basic functionalities", () => {
     });
   });
 });
+*/
