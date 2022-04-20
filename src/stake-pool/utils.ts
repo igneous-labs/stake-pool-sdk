@@ -248,80 +248,17 @@ export async function calcWithdrawalsInverse(
   validatorList: ValidatorList,
 ): Promise<ValidatorWithdrawalReceipt[]> {
   const {
-    publicKey: stakePoolPubkey,
-    account: { data: stakePool, owner: stakePoolProgramId },
+    account: { data: stakePool },
   } = stakePoolAccount;
-  const { validators } = validatorList;
-  // no active validators, withdraw from reserve
-  // also, reduce() throws error if array empty
-  if (validators.length < 1)
-    return [
-      {
-        stakeAccount: stakePool.reserveStake,
-        withdrawalReceipt: calcWithdrawalReceiptInverse(
-          withdrawalAmountLamports,
-          stakePool,
-        ),
-      },
-    ];
-
-  const stakePoolHasActive = validators.some(
-    (info) => !info.activeStakeLamports.isZero(),
-  );
-  const sortedValidators = validatorsByTotalStakeAsc(validators);
-  const validatorStakeAvailableToWithdraw = await Promise.all(
-    sortedValidators.map((validator) =>
-      stakeAvailableToWithdraw(
-        validator,
-        stakePoolProgramId,
-        stakePoolPubkey,
-        stakePoolHasActive,
-      ),
-    ),
-  );
-  const res: ValidatorWithdrawalReceipt[] = [];
-
-  let dropletsRemaining = calcWithdrawalReceiptInverse(
+  const { dropletsUnstaked } = await calcWithdrawalReceiptInverse(
     withdrawalAmountLamports,
     stakePool,
-  ).dropletsUnstaked;
-
-  // Withdraw from the lightest validators first
-  validatorStakeAvailableToWithdraw.forEach(({ lamports, stakeAccount }) => {
-    if (dropletsRemaining.isZero()) {
-      return;
-    }
-    const withdrawalReceipt = tryServiceWithdrawal(
-      dropletsRemaining,
-      lamports,
-      stakePool,
-    );
-    if (
-      !withdrawalReceipt.dropletsUnstaked.isZero() &&
-      !withdrawalReceipt.lamportsReceived.isZero()
-    ) {
-      res.push({
-        stakeAccount,
-        withdrawalReceipt,
-      });
-      dropletsRemaining = dropletsRemaining.satSub(
-        withdrawalReceipt.dropletsUnstaked,
-      );
-    }
-  });
-
-  // might happen if many transient stake accounts
-  if (!dropletsRemaining.isZero()) {
-    // Cannot proceed directly to transient stake accounts
-    // even if main stake account is exhausted because of
-    // MIN_ACTIVE_LAMPORTS.
-    // Cannot proceed directly to the reserves
-    // unless absolutely all stake accounts (main and transient) are deleted
-    // and you can only delete a main stake account with RemoveValidator instruction
-    throw new WithdrawalUnserviceableError(
-      "Too many transient stake accounts, please try again with a smaller withdraw amount or on the next epoch",
-    );
-  }
+  );
+  const res = await calcWithdrawals(
+    dropletsUnstaked,
+    stakePoolAccount,
+    validatorList,
+  );
 
   return res;
 }
@@ -877,16 +814,19 @@ function calcWithdrawalReceiptInverse(
     .mul(poolTokenSupply)
     .div(totalStakeLamports);
 
-  const dropletsToUnstake = dropletsBurnt
-    .mul(withdrawalFee.denominator)
-    .div(
-      Numberu64.cloneFromBN(
-        withdrawalFee.denominator.sub(withdrawalFee.numerator),
-      ),
-    );
-
   const hasFee =
     !withdrawalFee.numerator.isZero() && !withdrawalFee.denominator.isZero();
+
+  const dropletsToUnstake = hasFee
+    ? dropletsBurnt
+        .mul(withdrawalFee.denominator)
+        .div(
+          Numberu64.cloneFromBN(
+            withdrawalFee.denominator.sub(withdrawalFee.numerator),
+          ),
+        )
+    : new Numberu64(0);
+
   const dropletsFeePaid = hasFee
     ? Numberu64.cloneFromBN(
         withdrawalFee.numerator
