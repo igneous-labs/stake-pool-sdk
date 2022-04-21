@@ -738,12 +738,6 @@ export function calcStakeDeposit(
   );
 }
 
-export function ceilDiv(numerator: BN, denominator: BN): Numberu64 {
-  return Numberu64.cloneFromBN(
-    numerator.add(denominator).sub(new Numberu64(1)).div(denominator),
-  );
-}
-
 /**
  * Helper function for calculating expected lamports given the amount of droplets to withdraw.
  * Mirrors on-chain math exactly.
@@ -786,7 +780,7 @@ function calcWithdrawalReceipt(
   //   num.add(poolTokenSupply).sub(new Numberu64(1)).div(poolTokenSupply),
   // );
 
-  const lamportsReceived = ceilDiv(num, poolTokenSupply);
+  const lamportsReceived = Numberu64.cloneFromBN(num).ceilDiv(poolTokenSupply);
 
   return {
     dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),

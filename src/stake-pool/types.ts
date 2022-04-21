@@ -158,6 +158,15 @@ export class Numberu64 extends BN {
       ? Numberu64.cloneFromBN(this.sub(other))
       : new Numberu64(0);
   }
+
+  /**
+   * Performs ceil division
+   */
+  ceilDiv(denominator: Numberu64 | BN): Numberu64 {
+    return Numberu64.cloneFromBN(
+      this.add(denominator).sub(new Numberu64(1)).div(denominator),
+    );
+  }
 }
 
 export type ValidatorAllStakeAccounts = {
