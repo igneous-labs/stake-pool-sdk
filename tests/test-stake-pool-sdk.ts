@@ -187,12 +187,9 @@ describe("test basic functionalities", () => {
       validatorList.account.data,
     );
 
-    let totalLamportsReceived: Numberu64 = new Numberu64(0);
-    validatorWithdrawalReceipts.forEach((receipt) => {
-      totalLamportsReceived = Numberu64.cloneFromBN(
-        totalLamportsReceived.add(receipt.withdrawalReceipt.lamportsReceived),
-      );
-    });
+    const totalLamportsReceived: Numberu64 = totalWithdrawLamports(
+      validatorWithdrawalReceipts,
+    );
 
     const validatorWithdrawalReceiptsInverse = await calcWithdrawalsInverse(
       totalLamportsReceived,
@@ -202,6 +199,8 @@ describe("test basic functionalities", () => {
 
     let totalDropletsToUnstake: Numberu64 = new Numberu64(0);
     let totalLamportsReceivedInverse: Numberu64 = new Numberu64(0);
+
+    // Accumulating two values, so just used forEach
     validatorWithdrawalReceiptsInverse.forEach((receipt) => {
       totalDropletsToUnstake = Numberu64.cloneFromBN(
         totalDropletsToUnstake.add(receipt.withdrawalReceipt.dropletsUnstaked),
