@@ -250,7 +250,7 @@ export async function calcWithdrawalsInverse(
   const {
     account: { data: stakePool },
   } = stakePoolAccount;
-  const { dropletsUnstaked } = await calcWithdrawalReceiptInverse(
+  const dropletsUnstaked = estDropletsUnstakedByWithdrawal(
     withdrawalAmountLamports,
     stakePool,
   );
@@ -786,39 +786,6 @@ function calcWithdrawalReceipt(
     dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
     lamportsReceived,
     dropletsFeePaid,
-  };
-}
-
-function calcWithdrawalReceiptInverse(
-  lamportsToReceive: Numberu64,
-  stakePool: schema.StakePool,
-): WithdrawalReceipt {
-  const { withdrawalFee, totalStakeLamports, poolTokenSupply } = stakePool;
-
-  // If poolTokenSupply == 0, then below values should all be 0 as well.
-  const dropletsBurnt = lamportsToReceive
-    .mul(poolTokenSupply)
-    .div(totalStakeLamports);
-
-  const hasFee =
-    !withdrawalFee.numerator.isZero() && !withdrawalFee.denominator.isZero();
-
-  const dropletsToUnstake = hasFee
-    ? dropletsBurnt
-        .mul(withdrawalFee.denominator)
-        .div(
-          Numberu64.cloneFromBN(
-            withdrawalFee.denominator.sub(withdrawalFee.numerator),
-          ),
-        )
-    : dropletsBurnt;
-
-  const dropletsFeePaid = dropletsToUnstake.sub(dropletsBurnt);
-
-  return {
-    dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
-    lamportsReceived: lamportsToReceive,
-    dropletsFeePaid: Numberu64.cloneFromBN(dropletsFeePaid),
   };
 }
 
