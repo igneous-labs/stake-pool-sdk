@@ -602,6 +602,12 @@ export async function getDefaultDepositAuthority(
   return key;
 }
 
+function ceilDiv(numerator: BN, denominator: BN): Numberu64 {
+  return Numberu64.cloneFromBN(
+    numerator.add(denominator).sub(new Numberu64(1)).div(denominator),
+  );
+}
+
 /**
  * Helper function for calculating expected droplets given a deposit and the deposit fee struct.
  * Mirrors on-chain math exactly.
@@ -651,16 +657,14 @@ function calcDepositInverse(
   referralFee: number,
 ): DepositReceipt {
   // dropletsMinted = dropletsToReceive / (1 - depositFee)
-  const dropletsMinted = dropletsToReceive
-    .mul(depositFee.denominator)
-    .div(
-      Numberu64.cloneFromBN(depositFee.denominator.sub(depositFee.numerator)),
-    );
+  const dropletsMinted = ceilDiv(
+    dropletsToReceive.mul(depositFee.denominator),
+    depositFee.denominator.sub(depositFee.numerator),
+  );
 
-  const lamportsToStake = Numberu64.cloneFromBN(
-    dropletsMinted
-      .mul(stakePool.totalStakeLamports)
-      .div(stakePool.poolTokenSupply),
+  const lamportsToStake = ceilDiv(
+    dropletsMinted.mul(stakePool.totalStakeLamports),
+    stakePool.poolTokenSupply,
   );
 
   const hasFee =
@@ -776,11 +780,7 @@ function calcWithdrawalReceipt(
   }
   // on-chain logic is ceil div
   // overflow safety: 1 < num + poolTokenSupply
-  // const lamportsReceived = Numberu64.cloneFromBN(
-  //   num.add(poolTokenSupply).sub(new Numberu64(1)).div(poolTokenSupply),
-  // );
-
-  const lamportsReceived = Numberu64.cloneFromBN(num).ceilDiv(poolTokenSupply);
+  const lamportsReceived = ceilDiv(num, poolTokenSupply);
 
   return {
     dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
