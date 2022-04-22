@@ -149,8 +149,7 @@ describe("test basic functionalities", () => {
     const socean = new Socean("testnet");
     const stakePool = await socean.getStakePoolAccount();
 
-    const depositAmountSol = Math.random();
-    const depositAmount = Math.round(depositAmountSol * LAMPORTS_PER_SOL);
+    const depositAmount = Math.round(Math.random() * Number.MAX_SAFE_INTEGER);
     const depositAmountLamports = new Numberu64(depositAmount);
     const { dropletsReceived, dropletsFeePaid, referralFeePaid } =
       calcSolDeposit(depositAmountLamports, stakePool.account.data);
