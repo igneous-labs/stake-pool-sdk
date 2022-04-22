@@ -836,6 +836,24 @@ export function totalWithdrawLamports(
 }
 
 /**
+ * Sums up the total number of droplets unstaked
+ * given an array of `ValidatorWithdrawalReceipt`s
+ * @param receipts
+ * @returns
+ */
+export function totalUnstakedDroplets(
+  receipts: ValidatorWithdrawalReceipt[],
+): Numberu64 {
+  return receipts.reduce(
+    (accum, receipt) =>
+      Numberu64.cloneFromBN(
+        accum.add(receipt.withdrawalReceipt.dropletsUnstaked),
+      ),
+    new Numberu64(0),
+  );
+}
+
+/**
  * Sums up the total number of droplets (1 / 10 ** 9 scnSOL) paid
  * in withdrawal fees given an array of `ValidatorWithdrawalReceipt`s
  * @param receipts

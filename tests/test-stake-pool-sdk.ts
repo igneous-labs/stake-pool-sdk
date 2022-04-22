@@ -19,6 +19,7 @@ import {
   calcWithdrawals,
   calcWithdrawalsInverse,
   Socean,
+  totalUnstakedDroplets,
   totalWithdrawLamports,
 } from "@/socean";
 import { Numberu64 } from "@/stake-pool/types";
@@ -196,20 +197,12 @@ describe("test basic functionalities", () => {
       validatorList.account.data,
     );
 
-    let totalDropletsToUnstake: Numberu64 = new Numberu64(0);
-    let totalLamportsReceivedInverse: Numberu64 = new Numberu64(0);
-
-    // Accumulating two values, so just used forEach
-    validatorWithdrawalReceiptsInverse.forEach((receipt) => {
-      totalDropletsToUnstake = Numberu64.cloneFromBN(
-        totalDropletsToUnstake.add(receipt.withdrawalReceipt.dropletsUnstaked),
-      );
-      totalLamportsReceivedInverse = Numberu64.cloneFromBN(
-        totalLamportsReceivedInverse.add(
-          receipt.withdrawalReceipt.lamportsReceived,
-        ),
-      );
-    });
+    const totalDropletsToUnstake = totalUnstakedDroplets(
+      validatorWithdrawalReceiptsInverse,
+    );
+    const totalLamportsReceivedInverse = totalWithdrawLamports(
+      validatorWithdrawalReceiptsInverse,
+    );
 
     expect(totalDropletsToUnstake.toNumber()).to.be.gte(
       withdrawAmountDroplets.toNumber(),
