@@ -18,8 +18,11 @@ export {
 } from "@/socean/transactions";
 export {
   calcSolDeposit,
+  calcSolDepositInverse,
   calcStakeDeposit,
   calcWithdrawals,
+  calcWithdrawalsInverse,
   totalWithdrawLamports,
+  totalUnstakedDroplets,
   totalWithdrawalFeesDroplets,
 } from "@/stake-pool/utils";

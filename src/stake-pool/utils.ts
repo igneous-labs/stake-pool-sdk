@@ -19,7 +19,7 @@ import {
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
-import { BN } from "bn.js";
+import BN from "bn.js";
 
 import { RpcError, WithdrawalUnserviceableError } from "@/socean/err";
 import { TransactionWithSigners } from "@/socean/transactions";
@@ -240,6 +240,21 @@ export async function calcWithdrawals(
   }
 
   return res;
+}
+
+export async function calcWithdrawalsInverse(
+  withdrawalAmountLamports: Numberu64,
+  stakePoolAccount: StakePoolAccount,
+  validatorList: ValidatorList,
+): Promise<ValidatorWithdrawalReceipt[]> {
+  const {
+    account: { data: stakePool },
+  } = stakePoolAccount;
+  const dropletsUnstaked = estDropletsUnstakedByWithdrawal(
+    withdrawalAmountLamports,
+    stakePool,
+  );
+  return calcWithdrawals(dropletsUnstaked, stakePoolAccount, validatorList);
 }
 
 function validatorsByTotalStakeAsc(
@@ -587,6 +602,12 @@ export async function getDefaultDepositAuthority(
   return key;
 }
 
+function ceilDiv(numerator: BN, denominator: BN): Numberu64 {
+  return Numberu64.cloneFromBN(
+    numerator.add(denominator).sub(new Numberu64(1)).div(denominator),
+  );
+}
+
 /**
  * Helper function for calculating expected droplets given a deposit and the deposit fee struct.
  * Mirrors on-chain math exactly.
@@ -629,6 +650,44 @@ function calcDeposit(
   };
 }
 
+function calcDepositInverse(
+  dropletsToReceive: Numberu64,
+  stakePool: schema.StakePool,
+  depositFee: schema.Fee,
+  referralFee: number,
+): DepositReceipt {
+  // dropletsMinted = dropletsToReceive / (1 - depositFee)
+  const dropletsMinted = ceilDiv(
+    dropletsToReceive.mul(depositFee.denominator),
+    depositFee.denominator.sub(depositFee.numerator),
+  );
+
+  const lamportsToStake = ceilDiv(
+    dropletsMinted.mul(stakePool.totalStakeLamports),
+    stakePool.poolTokenSupply,
+  );
+
+  const hasFee =
+    !depositFee.numerator.isZero() && !depositFee.denominator.isZero();
+
+  const dropletsFeePaid = hasFee
+    ? Numberu64.cloneFromBN(
+        depositFee.numerator.mul(dropletsMinted).div(depositFee.denominator),
+      )
+    : new Numberu64(0);
+
+  const referralFeePaid = Numberu64.cloneFromBN(
+    dropletsFeePaid.mul(new BN(referralFee)).div(new BN(100)),
+  );
+
+  return {
+    lamportsStaked: lamportsToStake,
+    dropletsReceived: dropletsToReceive,
+    dropletsFeePaid,
+    referralFeePaid,
+  };
+}
+
 /**
  * Calculates and returns the expected amount of droplets (1 / 10 ** 9 scnSOL) to be received
  * by the user for staking SOL, with deposit fees factored in.
@@ -644,6 +703,18 @@ export function calcSolDeposit(
 ): DepositReceipt {
   return calcDeposit(
     lamportsToStake,
+    stakePool,
+    stakePool.solDepositFee,
+    stakePool.solReferralFee,
+  );
+}
+
+export function calcSolDepositInverse(
+  dropletsToReceive: Numberu64,
+  stakePool: schema.StakePool,
+): DepositReceipt {
+  return calcDepositInverse(
+    dropletsToReceive,
     stakePool,
     stakePool.solDepositFee,
     stakePool.solReferralFee,
@@ -709,9 +780,8 @@ function calcWithdrawalReceipt(
   }
   // on-chain logic is ceil div
   // overflow safety: 1 < num + poolTokenSupply
-  const lamportsReceived = Numberu64.cloneFromBN(
-    num.add(poolTokenSupply).sub(new Numberu64(1)).div(poolTokenSupply),
-  );
+  const lamportsReceived = ceilDiv(num, poolTokenSupply);
+
   return {
     dropletsUnstaked: Numberu64.cloneFromBN(dropletsToUnstake),
     lamportsReceived,
@@ -760,6 +830,24 @@ export function totalWithdrawLamports(
     (accum, receipt) =>
       Numberu64.cloneFromBN(
         accum.add(receipt.withdrawalReceipt.lamportsReceived),
+      ),
+    new Numberu64(0),
+  );
+}
+
+/**
+ * Sums up the total number of droplets unstaked
+ * given an array of `ValidatorWithdrawalReceipt`s
+ * @param receipts
+ * @returns
+ */
+export function totalUnstakedDroplets(
+  receipts: ValidatorWithdrawalReceipt[],
+): Numberu64 {
+  return receipts.reduce(
+    (accum, receipt) =>
+      Numberu64.cloneFromBN(
+        accum.add(receipt.withdrawalReceipt.dropletsUnstaked),
       ),
     new Numberu64(0),
   );
