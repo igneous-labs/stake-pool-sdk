@@ -1,5 +1,6 @@
 export { Socean } from "@/socean/socean";
 export { SoceanConfig, ClusterType } from "@/socean/config";
+export * from "@/stake-pool/instructions";
 export {
   DepositReceipt,
   StakePoolAccount,
