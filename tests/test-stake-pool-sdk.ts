@@ -212,10 +212,10 @@ describe("test basic functionalities", () => {
       );
     });
 
-    expect(totalDropletsToUnstake.toNumber()).to.be.above(
+    expect(totalDropletsToUnstake.toNumber()).to.be.gte(
       withdrawAmountDroplets.toNumber(),
     );
-    expect(totalLamportsReceivedInverse.toNumber()).to.be.above(
+    expect(totalLamportsReceivedInverse.toNumber()).to.be.gte(
       totalLamportsReceived.toNumber(),
     );
   });
