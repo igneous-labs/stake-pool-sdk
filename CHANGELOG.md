@@ -7,7 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0] - 2022-04-28
 
 ### Fixed
-
 - `Socean` constructor failing when `Connection` is passed in as arg when used in packages that contain their own installation of `@solana/web3.js`.
 
 ### Changed
