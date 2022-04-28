@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Socean` constructor failing when `Connection` is passed in as arg when used in packages that contain their own installation of `@solana/web3.js`.
 
 ### Changed
-- All `TransactionInstruction` functions are now exported,
+- All `TransactionInstruction` functions are now exported
 
 ### Added
 - utils:
