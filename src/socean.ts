@@ -182,7 +182,7 @@ export class Socean {
    *                     Must be active and delegated to a validator in the stake pool.
    * @param amount       The amount of stake to split from `stakeAccount` to deposit.
    *                     If not provided or 0, the entire stake account is deposited.
-   *                     Otherwise, a stake account is first split from `stakeAccount` and then deposited.
+   *                     Otherwise, a stake account containing `amount` is first split from `stakeAccount` and then deposited.
    * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
    * @param confirmOptions transaction confirm options for each transaction
    * @returns the transaction signatures of the transactions sent and confirmed
@@ -221,7 +221,7 @@ export class Socean {
    *                     Must be active and delegated to a validator in the stake pool.
    * @param amount       The amount of stake to split from `stakeAccount` to deposit.
    *                     If not provided or 0, the entire stake account is deposited.
-   *                     Otherwise, a stake account is first split from `stakeAccount` and then deposited.
+   *                     Otherwise, a stake account containing `amount` is first split from `stakeAccount` and then deposited.
    * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
    * @returns the deposit transaction sequence
    * @throws RpcError
