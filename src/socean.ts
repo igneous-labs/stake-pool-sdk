@@ -283,7 +283,7 @@ export class Socean {
     );
 
     const signers: Signer[] = [];
-    let stakeAccountPubkey = stakeAccount;
+    let stakeAccountToDeposit = stakeAccount;
 
     if (
       amount &&
@@ -292,12 +292,12 @@ export class Socean {
     ) {
       const splitStakeAccount = Keypair.generate();
       signers.push(splitStakeAccount);
-      stakeAccountPubkey = splitStakeAccount.publicKey;
+      stakeAccountToDeposit = splitStakeAccount.publicKey;
 
       const splitTx = StakeProgram.split({
         stakePubkey: stakeAccount,
         authorizedPubkey: walletPubkey,
-        splitStakePubkey: stakeAccountPubkey,
+        splitStakePubkey: splitStakeAccount.publicKey,
         lamports: amount.toNumber(),
       });
       tx.add(splitTx);
@@ -309,7 +309,7 @@ export class Socean {
       stakePool.account.data.validatorList,
       stakePool.account.data.depositAuthority,
       stakePoolWithdrawAuthority,
-      stakeAccountPubkey,
+      stakeAccountToDeposit,
       vsa,
       stakePool.account.data.reserveStake,
       poolTokenTo,
