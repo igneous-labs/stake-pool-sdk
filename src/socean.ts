@@ -7,8 +7,10 @@
  */
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
+  Commitment,
   ConfirmOptions,
   Connection,
+  Context,
   Keypair,
   PublicKey,
   StakeProgram,
@@ -591,6 +593,64 @@ export class Socean {
       main,
       transient,
     };
+  }
+
+  /**
+   * Register an onAccountChange websocket listener for the stake pool account
+   * and returns the websocket clientSubscriptionId
+   * To remove, call this.config.connection.removeAccountChangeListener(clientSubscriptionId)
+   * @param callback
+   * @param commitment
+   * @returns clientSubscriptionId
+   */
+  onStakePoolChange(
+    callback: (stakePoolAccount: StakePoolAccount, context: Context) => void,
+    commitment?: Commitment,
+  ): number {
+    return this.config.connection.onAccountChange(
+      this.config.stakePoolAccountPubkey,
+      (account, context) => {
+        const stakePoolAccount = getStakePoolFromAccountInfo(
+          this.config.stakePoolAccountPubkey,
+          account,
+        );
+        callback(stakePoolAccount, context);
+      },
+      commitment,
+    );
+  }
+
+  /**
+   * Register an onAccountChange websocket listener for the validator list account
+   * and returns the websocket clientSubscriptionId
+   * To remove, call this.config.connection.removeAccountChangeListener(clientSubscriptionId)
+   * @param callback
+   * @param commitment
+   * @returns clientSubscriptionId
+   */
+  async onValidatorListChange(
+    callback: (
+      validatorListAccount: ValidatorListAccount,
+      context: Context,
+    ) => void,
+    commitment?: Commitment,
+  ): Promise<number> {
+    const {
+      account: {
+        data: { validatorList },
+      },
+    } = await this.getStakePoolAccount();
+    return this.config.connection.onAccountChange(
+      validatorList,
+      (account, context) => {
+        const validatorListAccount = getValidatorListFromAccountInfo(
+          validatorList,
+          account,
+        );
+        callback(validatorListAccount, context);
+      },
+      commitment,
+    );
   }
 }
 
