@@ -16,7 +16,7 @@ export class Fee extends Struct {
 
 export class AccountType extends Enum {}
 
-export class AccountTypeEnum extends Struct {}
+class AccountTypeEnum extends Struct {}
 
 export enum AccountTypeKind {
   Uninitialized = "Uninitialized",
@@ -98,9 +98,10 @@ export class ValidatorStakeInfo extends Struct {
 
   voteAccountAddress: PublicKey;
 }
+
 export class StakeStatus extends Enum {}
 
-export class StakeStatusEnum extends Struct {}
+class StakeStatusEnum extends Struct {}
 
 export class Lockup extends Struct {
   unixtime: BN;

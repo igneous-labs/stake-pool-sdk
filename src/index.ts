@@ -2,6 +2,17 @@ export { Socean } from "@/socean/socean";
 export { SoceanConfig, ClusterType } from "@/socean/config";
 export * from "@/stake-pool/instructions";
 export {
+  AccountType,
+  AccountTypeKind,
+  Fee,
+  Lockup,
+  StakePool,
+  StakeStatus,
+  StakeStatusKind,
+  ValidatorList,
+  ValidatorStakeInfo,
+} from "@/stake-pool/schema";
+export {
   DepositReceipt,
   StakePoolAccount,
   Numberu64,
