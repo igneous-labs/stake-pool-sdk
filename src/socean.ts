@@ -627,6 +627,8 @@ export class Socean {
    * @param callback
    * @param commitment
    * @returns clientSubscriptionId
+   * @throws RpcError
+   * @throws AccountDoesNotExistError if stake pool does not exist
    */
   async onValidatorListChange(
     callback: (
