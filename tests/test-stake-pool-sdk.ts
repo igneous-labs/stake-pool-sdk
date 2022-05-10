@@ -80,6 +80,7 @@ describe("test basic functionalities", () => {
     const tx = await socean.depositStakeTransactions(
       staker.publicKey,
       testnetStakeAcc,
+      undefined,
       referrer.publicKey,
     );
     console.log(JSON.stringify(tx, null, 4));
@@ -96,6 +97,7 @@ describe("test basic functionalities", () => {
         await socean.depositStakeTransactions(
           staker.publicKey,
           invalidStakeAcc.publicKey,
+          undefined,
           referrer.publicKey,
         );
       },
