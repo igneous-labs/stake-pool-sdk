@@ -13,6 +13,7 @@ import {
   Context,
   Keypair,
   PublicKey,
+  Signer,
   StakeProgram,
   Transaction,
 } from "@solana/web3.js";
@@ -75,7 +76,8 @@ export class Socean {
 
   /**
    * Signs, sends and confirms the transactions required to deposit SOL
-   * into the Socean stake pool
+   * into the Socean stake pool.
+   * Creates the scnSOL associated token account for the wallet if it doesnt exist.
    * @param walletAdapter SOL wallet to deposit SOL from
    * @param amountLamports amount to deposit in lamports
    * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
@@ -105,6 +107,7 @@ export class Socean {
    * Creates a `TransactionSequence` that deposits SOL into Socean stake pool
    * Each inner `TransactionWithSigners` array must be executed and confirmed
    * before going to the next one.
+   * Creates the scnSOL associated token account for the wallet if it doesnt exist.
    * This is a lower-level API for compatibility, recommend using `depositSol()` instead if possible.
    * @param walletPubkey SOL wallet to deposit SOL from
    * @param amountLamports amount to deposit in lamports
@@ -175,11 +178,13 @@ export class Socean {
   /**
    * Signs, sends and confirms the transactions required to deposit a stake account
    * into the Socean stake pool
+   * Creates the scnSOL associated token account for the wallet if it doesnt exist.
    * @param walletAdapter SOL wallet to deposit SOL from
    * @param stakeAccount The stake account to deposit.
    *                     Must be active and delegated to a validator in the stake pool.
-   *                     The entire stake account is deposited. To deposit only a portion of it, prefix this instruction
-   *                     with a stake split instruction and deposit the stake account that's split off instead.
+   * @param amountLamports The amount of stake to split from `stakeAccount` to deposit.
+   *                       If not provided or 0, the entire stake account is deposited.
+   *                       Otherwise, a stake account containing `amountLamports` is first split from `stakeAccount` and then deposited.
    * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
    * @param confirmOptions transaction confirm options for each transaction
    * @returns the transaction signatures of the transactions sent and confirmed
@@ -191,6 +196,7 @@ export class Socean {
   async depositStake(
     walletAdapter: WalletAdapter,
     stakeAccount: PublicKey,
+    amountLamports?: Numberu64,
     referrerPoolTokenAccount?: PublicKey,
     confirmOptions: ConfirmOptions = TRANSACTION_SEQUENCE_DEFAULT_CONFIRM_OPTIONS,
   ): Promise<TransactionSequenceSignatures> {
@@ -199,6 +205,7 @@ export class Socean {
     const txSeq = await this.depositStakeTransactions(
       walletPubkey,
       stakeAccount,
+      amountLamports,
       referrerPoolTokenAccount,
     );
     return this.signAndSend(walletAdapter, txSeq, confirmOptions);
@@ -209,12 +216,14 @@ export class Socean {
    * with one of the Socean stake pool's validators into Socean stake pool
    * Each inner `TransactionWithSigners` array must be executed and confirmed
    * before going to the next one.
+   * Creates the scnSOL associated token account for the wallet if it doesnt exist.
    * This is a lower-level API for compatibility, recommend using `depositStake()` instead if possible.
    * @param walletPubkey SOL wallet to deposit SOL from
    * @param stakeAccount The stake account to deposit.
    *                     Must be active and delegated to a validator in the stake pool.
-   *                     The entire stake account is deposited. To deposit only a portion of it, prefix this instruction
-   *                     with a stake split instruction and deposit the stake account that's split off instead.
+   * @param amountLamports The amount of stake to split from `stakeAccount` to deposit.
+   *                       If not provided or 0, the entire stake account is deposited.
+   *                       Otherwise, a stake account containing `amountLamports` is first split from `stakeAccount` and then deposited.
    * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
    * @returns the deposit transaction sequence
    * @throws RpcError
@@ -224,6 +233,7 @@ export class Socean {
   async depositStakeTransactions(
     walletPubkey: PublicKey,
     stakeAccount: PublicKey,
+    amountLamports?: Numberu64,
     referrerPoolTokenAccount?: PublicKey,
   ): Promise<TransactionSequence> {
     const { value } = await this.config.connection.getParsedAccountInfo(
@@ -239,7 +249,10 @@ export class Socean {
     )
       throw new StakeAccountToDepositInvalidError("not a stake account");
     const stakeAccountInfo: ParsedStakeAccount = value.data.parsed;
-    if (!stakeAccountInfo.info.stake.delegation.voter)
+    if (
+      !stakeAccountInfo.info.stake.delegation.voter ||
+      !stakeAccountInfo.info.stake.delegation.stake
+    )
       throw new StakeAccountToDepositInvalidError(
         "stake account not delegated",
       );
@@ -271,13 +284,34 @@ export class Socean {
       this.config.stakePoolAccountPubkey,
     );
 
+    const signers: Signer[] = [];
+    let stakeAccountToDeposit = stakeAccount;
+
+    if (
+      amountLamports &&
+      !amountLamports.isZero() &&
+      amountLamports.lt(stakeAccountInfo.info.stake.delegation.stake)
+    ) {
+      const splitStakeAccount = Keypair.generate();
+      signers.push(splitStakeAccount);
+      stakeAccountToDeposit = splitStakeAccount.publicKey;
+
+      const splitTx = StakeProgram.split({
+        stakePubkey: stakeAccount,
+        authorizedPubkey: walletPubkey,
+        splitStakePubkey: splitStakeAccount.publicKey,
+        lamports: amountLamports.toNumber(),
+      });
+      tx.add(splitTx);
+    }
+
     const ix = depositStakeInstruction(
       this.config.stakePoolProgramId,
       this.config.stakePoolAccountPubkey,
       stakePool.account.data.validatorList,
       stakePool.account.data.depositAuthority,
       stakePoolWithdrawAuthority,
-      stakeAccount,
+      stakeAccountToDeposit,
       vsa,
       stakePool.account.data.reserveStake,
       poolTokenTo,
@@ -291,7 +325,7 @@ export class Socean {
       [
         {
           tx,
-          signers: [],
+          signers,
         },
       ],
     ];

@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNRELEASED]
 
+### Changed
+- `depositStake` and `depositStakeTransactions` now take an additional `amount` argument that can be used to split an active stake account before depositing. 
+
 ### Added
 - `onStakePoolChange` and `onValidatorListChange`
 
