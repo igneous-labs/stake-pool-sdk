@@ -14,6 +14,7 @@ import {
   Keypair,
   PublicKey,
   Signer,
+  StakeAuthorizationLayout,
   StakeProgram,
   Transaction,
 } from "@solana/web3.js";
@@ -23,6 +24,7 @@ import { signAndSendTransactionSequence } from "@/socean";
 import { ClusterType, SoceanConfig } from "@/socean/config";
 import {
   AccountDoesNotExistError,
+  StakeAccountNotRentExemptError,
   StakeAccountToDepositInvalidError,
   WalletPublicKeyUnavailableError,
 } from "@/socean/err";
@@ -56,6 +58,7 @@ import {
   getValidatorTransientStakeAccount,
   getWithdrawAuthority,
   getWithdrawStakeTransactions,
+  STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS,
   tryRpc,
 } from "@/stake-pool/utils";
 
@@ -183,8 +186,10 @@ export class Socean {
    * @param stakeAccount The stake account to deposit.
    *                     Must be active and delegated to a validator in the stake pool.
    * @param amountLamports The amount of stake to split from `stakeAccount` to deposit.
-   *                       If not provided or 0, the entire stake account is deposited.
+   *                       If not provided, 0, or greater than the staked balance, the entire stake account is deposited.
    *                       Otherwise, a stake account containing `amountLamports` is first split from `stakeAccount` and then deposited.
+   *                       Must be greater than `STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS` and leave more than `STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS`
+   *                       remaining in the stake account it is split from.
    * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
    * @param confirmOptions transaction confirm options for each transaction
    * @returns the transaction signatures of the transactions sent and confirmed
@@ -192,6 +197,7 @@ export class Socean {
    * @throws AccountDoesNotExistError if stake pool or main validator stake account for `stakeAccount`'s validator does not exist
    * @throws WalletPublicKeyUnavailableError
    * @throws StakeAccountToDepositInvalidError if stake account to deposit does not meet deposit requirements
+   * @throws StakeAccountNotRentExempt if provided `amountLamports` leaves a stake account at or below below rent-exempt balance
    */
   async depositStake(
     walletAdapter: WalletAdapter,
@@ -222,13 +228,16 @@ export class Socean {
    * @param stakeAccount The stake account to deposit.
    *                     Must be active and delegated to a validator in the stake pool.
    * @param amountLamports The amount of stake to split from `stakeAccount` to deposit.
-   *                       If not provided or 0, the entire stake account is deposited.
+   *                       If not provided, 0, or greater than the staked balance, the entire stake account is deposited.
    *                       Otherwise, a stake account containing `amountLamports` is first split from `stakeAccount` and then deposited.
+   *                       Must be greater than `STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS` and leave more than `STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS`
+   *                       remaining in the stake account it is split from.
    * @param referrerPoolTokenAccount PublicKey of a scnSOL token account of the referrer for this deposit
    * @returns the deposit transaction sequence
    * @throws RpcError
    * @throws AccountDoesNotExistError if stake pool or main validator stake account for `stakeAccount`'s validator does not exist
    * @throws StakeAccountToDepositInvalidError if stake account to deposit does not meet deposit requirements
+   * @throws StakeAccountNotRentExempt if provided `amountLamports` leaves a stake account at or below rent-exempt balance
    */
   async depositStakeTransactions(
     walletPubkey: PublicKey,
@@ -249,6 +258,7 @@ export class Socean {
     )
       throw new StakeAccountToDepositInvalidError("not a stake account");
     const stakeAccountInfo: ParsedStakeAccount = value.data.parsed;
+    const stakeAccountLamports = new Numberu64(value.lamports);
     if (
       !stakeAccountInfo.info.stake.delegation.voter ||
       !stakeAccountInfo.info.stake.delegation.stake
@@ -290,8 +300,17 @@ export class Socean {
     if (
       amountLamports &&
       !amountLamports.isZero() &&
-      amountLamports.lt(stakeAccountInfo.info.stake.delegation.stake)
+      amountLamports.lt(stakeAccountLamports)
     ) {
+      if (
+        amountLamports.lte(STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS) ||
+        stakeAccountLamports
+          .sub(amountLamports)
+          .lte(STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS)
+      ) {
+        throw new StakeAccountNotRentExemptError();
+      }
+
       const splitStakeAccount = Keypair.generate();
       signers.push(splitStakeAccount);
       stakeAccountToDeposit = splitStakeAccount.publicKey;
@@ -304,6 +323,24 @@ export class Socean {
       });
       tx.add(splitTx);
     }
+
+    // set stake and withdraw authority to stake pool deposit authority
+    tx.add(
+      StakeProgram.authorize({
+        stakePubkey: stakeAccountToDeposit,
+        authorizedPubkey: walletPubkey,
+        newAuthorizedPubkey: stakePool.account.data.depositAuthority,
+        stakeAuthorizationType: StakeAuthorizationLayout.Staker,
+      }),
+    );
+    tx.add(
+      StakeProgram.authorize({
+        stakePubkey: stakeAccountToDeposit,
+        authorizedPubkey: walletPubkey,
+        newAuthorizedPubkey: stakePool.account.data.depositAuthority,
+        stakeAuthorizationType: StakeAuthorizationLayout.Withdrawer,
+      }),
+    );
 
     const ix = depositStakeInstruction(
       this.config.stakePoolProgramId,

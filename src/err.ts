@@ -51,6 +51,14 @@ export class StakeAccountToDepositInvalidError extends Error {
   }
 }
 
+export class StakeAccountNotRentExemptError extends Error {
+  constructor() {
+    super(
+      `The transaction would leave a stake account at or below the rent-exempt balance`,
+    );
+  }
+}
+
 /// **
 // * Error class representing a partially-filled withdraw-stake operation
 // */

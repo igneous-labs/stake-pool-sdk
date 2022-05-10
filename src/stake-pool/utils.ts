@@ -275,7 +275,7 @@ const MIN_ACTIVE_STAKE_LAMPORTS = new Numberu64(1_000_000); // 0.001 SOL
 
 // TODO: this might change in the future if rent costs change
 // but since this is a const in the on-chain prog too, fuck it
-const STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS = new Numberu64(2_282_880);
+export const STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS = new Numberu64(2_282_880);
 
 /**
  * Gets the stake available to withdraw from a validator.

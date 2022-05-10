@@ -102,6 +102,11 @@ export const depositSolInstruction = (
 
 /**
  * Initializes a DepositStake stake pool instruction given the required accounts and data
+ * This instruction assumes that the `depositStakeAddress` stake account's withdraw and deposit
+ * authority has already been set to `stakePoolDepositAuthority`.
+ * To use this in a transaction, prefix this instruction with two `StakeProgram.authorize` instructions
+ * to change the stake account's authorities to `stakePoolDepositAuthority`.
+ *
  * @param stakePoolProgramId: Pubkey of the stake pool program
  * @param stakePool: Pubkey of the stake pool to deposit to
  * @param validatorList: Pubkey of the stake pool's validator list.

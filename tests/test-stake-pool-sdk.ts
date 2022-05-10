@@ -19,6 +19,7 @@ import {
   calcWithdrawals,
   calcWithdrawalsInverse,
   Socean,
+  STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS,
   totalUnstakedDroplets,
   totalWithdrawLamports,
 } from "@/socean";
@@ -250,7 +251,7 @@ describe("testnet executions", () => {
     );
   });
 
-  it("it deposits and withdraws on testnet", async () => {
+  it("it deposits SOL, withdraws stake, and deposits stake on testnet", async () => {
     const socean = new Socean("testnet");
 
     // deposit 0.5 sol
@@ -306,6 +307,31 @@ describe("testnet executions", () => {
     allStakeAccounts.forEach((stakeAccount) => {
       expect(Number(stakeAccount.delegation.stake)).to.be.above(0);
     });
+
+    // partially re-deposit one of the stake accounts
+    const stakeAccountToDeposit = stakeAccountPubkeys[0];
+    const depositPartialStakeSigs = await socean.depositStake(
+      staker,
+      stakeAccountToDeposit,
+      Numberu64.cloneFromBN(
+        STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS.add(new Numberu64(1)),
+      ),
+    );
+    const lastDepositPartialStakeTxId = depositPartialStakeSigs.pop()?.pop();
+    await connection.confirmTransaction(
+      lastDepositPartialStakeTxId!,
+      "finalized",
+    );
+    console.log("deposit partial stake tx id:", lastDepositPartialStakeTxId);
+
+    // full re-deposit the same stake account
+    const depositFullStakeSigs = await socean.depositStake(
+      staker,
+      stakeAccountToDeposit,
+    );
+    const lastDepositFullStakeTxId = depositFullStakeSigs.pop()?.pop();
+    await connection.confirmTransaction(lastDepositFullStakeTxId!, "finalized");
+    console.log("deposit full stake tx id:", lastDepositFullStakeTxId);
   });
 
   it("it calcSolDeposit() matches actual droplets received", async () => {

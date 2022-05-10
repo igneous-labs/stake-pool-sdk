@@ -29,6 +29,7 @@ export {
   WalletAdapter,
 } from "@/socean/transactions";
 export {
+  STAKE_ACCOUNT_RENT_EXEMPT_LAMPORTS,
   calcSolDeposit,
   calcSolDepositInverse,
   calcStakeDeposit,
