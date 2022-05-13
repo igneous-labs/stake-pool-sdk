@@ -535,7 +535,9 @@ export class Socean {
       signers: [],
     };
 
-    return [updateValidatorListBalance, [finalTxWithSigners]];
+    return [updateValidatorListBalance, [finalTxWithSigners]].filter(
+      (arr) => arr.length > 0,
+    );
   }
 
   /**
@@ -552,9 +554,11 @@ export class Socean {
     // Based on transaction size limits
     const MAX_VALIDATORS_TO_UPDATE = 5;
 
-    const voteAccounts = validatorListAcc.account.data.validators.map(
-      (validator) => validator.voteAccountAddress,
-    );
+    const currentEpoch = await this.getCurrentEpoch();
+
+    const voteAccounts = validatorListAcc.account.data.validators
+      .filter((validator) => validator.lastUpdateEpoch.lt(new BN(currentEpoch)))
+      .map((validator) => validator.voteAccountAddress);
 
     const res: TransactionWithSigners[] = [];
 
