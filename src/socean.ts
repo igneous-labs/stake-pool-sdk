@@ -554,17 +554,27 @@ export class Socean {
     // Based on transaction size limits
     const MAX_VALIDATORS_TO_UPDATE = 5;
 
-    const currentEpoch = await this.getCurrentEpoch();
+    const currentEpoch = new BN(await this.getCurrentEpoch());
 
-    const voteAccounts = validatorListAcc.account.data.validators
-      .filter((validator) => validator.lastUpdateEpoch.lt(new BN(currentEpoch)))
-      .map((validator) => validator.voteAccountAddress);
+    const { validators } = validatorListAcc.account.data;
+    const voteAccounts = validators.map(
+      (validator) => validator.voteAccountAddress,
+    );
 
     const res: TransactionWithSigners[] = [];
+    let startIndex = 0;
 
-    for (let i = 0; i < voteAccounts.length; i += MAX_VALIDATORS_TO_UPDATE) {
-      const end = Math.min(voteAccounts.length, i + MAX_VALIDATORS_TO_UPDATE);
-      const chunk = voteAccounts.slice(i, end);
+    do {
+      const remaining = validators.slice(startIndex);
+      const firstNonUpdated = remaining.findIndex((validator) =>
+        validator.lastUpdateEpoch.lt(currentEpoch),
+      );
+      if (firstNonUpdated === -1) {
+        break;
+      }
+      startIndex += firstNonUpdated;
+      const endIndex = startIndex + MAX_VALIDATORS_TO_UPDATE;
+      const chunk = voteAccounts.slice(startIndex, endIndex);
 
       // eslint-disable-next-line no-await-in-loop
       const validatorsAllStakeAccounts = await Promise.all(
@@ -581,12 +591,14 @@ export class Socean {
           validatorListAcc.publicKey,
           stakePool.account.data.reserveStake,
           validatorsAllStakeAccounts,
-          i,
+          startIndex,
           false, // TODO: no_merge?
         ),
         signers: [],
       });
-    }
+
+      startIndex = endIndex;
+    } while (startIndex < voteAccounts.length);
 
     return res;
   }
