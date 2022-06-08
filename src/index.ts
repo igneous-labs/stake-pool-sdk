@@ -39,3 +39,11 @@ export {
   totalUnstakedDroplets,
   totalWithdrawalFeesDroplets,
 } from "@/stake-pool/utils";
+export {
+  RpcError,
+  AccountDoesNotExistError,
+  WithdrawalUnserviceableError,
+  WalletPublicKeyUnavailableError,
+  StakeAccountToDepositInvalidError,
+  StakeAccountNotRentExemptError,
+} from "@/socean/err";
