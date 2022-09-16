@@ -71,19 +71,23 @@ export function getStakePoolFromAccountInfo(
   pubkey: PublicKey,
   account: AccountInfo<Buffer>,
 ): StakePoolAccount {
-  const stakePool = schema.StakePool.decodeUnchecked(account.data);
-  // reverse the pubkey fields (work-around for borsh.js)
-  reverse(stakePool);
-
   return {
     publicKey: pubkey,
     account: {
-      data: stakePool,
+      data: decodeStakePool(account.data),
       executable: account.executable,
       lamports: account.lamports,
       owner: account.owner,
     },
   };
+}
+
+export function decodeStakePool(accountData: Buffer): schema.StakePool {
+  const stakePool = schema.StakePool.decodeUnchecked(accountData);
+  // reverse the pubkey fields (work-around for borsh.js since we decode pubkeys as u256)
+  // TODO: remove this hacky workaround
+  reverse(stakePool);
+  return stakePool;
 }
 
 /**
@@ -96,19 +100,23 @@ export function getValidatorListFromAccountInfo(
   pubkey: PublicKey,
   account: AccountInfo<Buffer>,
 ): ValidatorListAccount {
-  const validatorList = schema.ValidatorList.decodeUnchecked(account.data);
-  // reverse the pubkey fields (work-around for borsh.js)
-  reverse(validatorList);
-
   return {
     publicKey: pubkey,
     account: {
-      data: validatorList,
+      data: decodeValidatorList(account.data),
       executable: account.executable,
       lamports: account.lamports,
       owner: account.owner,
     },
   };
+}
+
+export function decodeValidatorList(accountData: Buffer): schema.ValidatorList {
+  const validatorList = schema.ValidatorList.decodeUnchecked(accountData);
+  // reverse the pubkey fields (work-around for borsh.js since we decode pubkeys as u256)
+  // TODO: remove this hacky workaround
+  reverse(validatorList);
+  return validatorList;
 }
 
 /**

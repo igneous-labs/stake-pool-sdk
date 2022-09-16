@@ -4,6 +4,7 @@
 /dist/
 /docs/
 .idea/*
+*stake-pool-sdk-*.tgz
 
 .DS_Store
 coverage

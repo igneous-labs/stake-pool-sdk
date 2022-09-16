@@ -38,6 +38,8 @@ export {
   totalWithdrawLamports,
   totalUnstakedDroplets,
   totalWithdrawalFeesDroplets,
+  decodeStakePool,
+  decodeValidatorList,
 } from "@/stake-pool/utils";
 export {
   RpcError,
