@@ -16,19 +16,6 @@ export interface TransactionWithSigners {
 }
 
 /**
- * Partially sign a transaction with its list of signers
- * @param transaction `TransactionWithSigners` to sign and convert to `Transaction`
- * @returns the partially signed `Transaction`
- */
-function partialSign(transaction: TransactionWithSigners): Transaction {
-  const { tx, signers } = transaction;
-  signers.forEach((signer) => {
-    tx.partialSign(signer);
-  });
-  return tx;
-}
-
-/**
  * Copied from @solana/wallet-adapter-base\
  * `WalletAdapterProps` &
  * `SignerWalletAdapterProps` excluding signTransaction prop
@@ -121,15 +108,24 @@ async function signSendConfirmTransactions(
 ): Promise<string[]> {
   const { blockhash } = await tryRpc(connection.getLatestBlockhash("recent"));
 
-  const partialSignedTransactions = transactionArray.map((transaction) => {
-    transaction.tx.feePayer = feePayer;
-    transaction.tx.recentBlockhash = blockhash;
-    // Once you sign/partial sign a transaction, you cannot modify it
-    return partialSign(transaction);
+  // Modify here, bec once you sign/partial sign a transaction, you cannot modify it
+  const preppedTransactions = transactionArray.map(({ tx }) => {
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = feePayer;
+    return tx;
   });
 
-  const signedTransactions = await walletAdapter.signAllTransactions(
-    partialSignedTransactions,
+  // Must sign with wallet first before signers bec strike-wallet mutates the tx
+  const walletSignedTransactions = await walletAdapter.signAllTransactions(
+    preppedTransactions,
+  );
+
+  const signedTransactions = walletSignedTransactions.map(
+    (walletSignedTransaction, i) => {
+      const { signers } = transactionArray[i];
+      walletSignedTransaction.partialSign(...signers);
+      return walletSignedTransaction;
+    },
   );
 
   const sigPromises = signedTransactions.map((tx) =>
