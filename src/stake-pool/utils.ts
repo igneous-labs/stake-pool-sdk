@@ -400,6 +400,7 @@ export async function getAssociatedTokenAddress(
     TOKEN_PROGRAM_ID,
     mint,
     owner,
+    true,
   );
 }
 

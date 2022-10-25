@@ -248,6 +248,7 @@ describe("testnet executions", () => {
       TOKEN_PROGRAM_ID,
       scnSolMintPubkey,
       staker.publicKey,
+      true,
     );
   });
 

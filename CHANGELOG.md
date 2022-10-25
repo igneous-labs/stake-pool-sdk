@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Call `signAllTransactions` before `partialSign` on transactions to suppport Strike Wallet
+- Set `allowOwnerOffCurve` to `true` for `getAssociatedTokenAddress()`
 
 ## [0.4.3] - 2022-09-16
 
