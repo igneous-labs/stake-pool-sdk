@@ -123,7 +123,11 @@ async function signSendConfirmTransactions(
   const signedTransactions = walletSignedTransactions.map(
     (walletSignedTransaction, i) => {
       const { signers } = transactionArray[i];
-      walletSignedTransaction.partialSign(...signers);
+      // @solana/web3.js throws if signers length === 0
+      // https://github.com/solana-labs/solana/blob/60f3dc5f724930a1687638bcea19646b65174428/web3.js/src/transaction/legacy.ts#L634-L636
+      if (signers.length > 0) {
+        walletSignedTransaction.partialSign(...signers);
+      }
       return walletSignedTransaction;
     },
   );
