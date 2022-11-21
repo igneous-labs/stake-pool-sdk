@@ -277,9 +277,13 @@ function validatorsByTotalStakeAsc(
   });
 }
 
-// A validator stake account needs this amount of active staked lamports
-// for the staker to be able to remove the validator from the stake pool.
-const MIN_ACTIVE_STAKE_LAMPORTS = new Numberu64(1_000_000); // 0.001 SOL
+/**
+ * A validator stake account needs this amount of active staked lamports
+ * for the staker to be able to remove the validator from the stake pool.
+ * NOTE: this is likely to be revised upwards to a network
+ * global of 1_000_000_000 (1 SOL) soon
+ */
+export const MIN_ACTIVE_STAKE_LAMPORTS = new Numberu64(1_000_000); // 0.001 SOL
 
 // TODO: this might change in the future if rent costs change
 // but since this is a const in the on-chain prog too, fuck it
@@ -762,7 +766,7 @@ export function calcStakeDeposit(
  *          and the withdrawal fees charged
  * @throws
  */
-function calcWithdrawalReceipt(
+export function calcWithdrawalReceipt(
   dropletsToUnstake: Numberu64,
   stakePool: schema.StakePool,
 ): WithdrawalReceipt {
