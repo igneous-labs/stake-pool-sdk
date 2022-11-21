@@ -55,21 +55,21 @@ export class StakePool extends Struct {
 
   fee: Fee;
 
-  nextEpochFee: Fee;
+  nextEpochFee?: Fee | null;
 
-  preferredDepositValidatorVoteAddress: PublicKey;
+  preferredDepositValidatorVoteAddress?: PublicKey | null;
 
-  preferredWithdrawValidatorVoteAddress: PublicKey;
+  preferredWithdrawValidatorVoteAddress?: PublicKey | null;
 
   stakeDepositFee: Fee;
 
   withdrawalFee: Fee;
 
-  nextWithdrawalFee: Fee;
+  nextWithdrawalFee?: Fee | null;
 
   stakeReferralFee: number;
 
-  solDepositAuthority: PublicKey;
+  solDepositAuthority?: PublicKey | null;
 
   solDepositFee: Fee;
 
@@ -81,7 +81,7 @@ export class ValidatorList extends Struct {
 
   maxValidators: number;
 
-  validators: [ValidatorStakeInfo];
+  validators: ValidatorStakeInfo[];
 }
 export class ValidatorStakeInfo extends Struct {
   activeStakeLamports: BN;
