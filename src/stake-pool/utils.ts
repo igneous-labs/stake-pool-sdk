@@ -479,15 +479,19 @@ export async function getWithdrawStakeTransactions(
       // create blank stake account
       const stakeSplitTo = Keypair.generate();
       newStakeAccounts.push(stakeSplitTo);
-      tx.add(
-        SystemProgram.createAccount({
-          fromPubkey: walletPubkey,
-          lamports: lamportsReqStakeAcc,
-          newAccountPubkey: stakeSplitTo.publicKey,
-          programId: StakeProgram.programId,
-          space: STAKE_STATE_LEN,
-        }),
-      );
+      const txInstruction = dropletsUnstaked.gt(new BN(lamportsReqStakeAcc))
+        ? SystemProgram.allocate({
+            accountPubkey: walletPubkey,
+            space: STAKE_STATE_LEN,
+          })
+        : SystemProgram.createAccount({
+            fromPubkey: walletPubkey,
+            lamports: lamportsReqStakeAcc,
+            newAccountPubkey: stakeSplitTo.publicKey,
+            programId: StakeProgram.programId,
+            space: STAKE_STATE_LEN,
+          });
+      tx.add(txInstruction);
       // The tx also needs to be signed by the new stake account's private key
       signers.push(stakeSplitTo);
 
